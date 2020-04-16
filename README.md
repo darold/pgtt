@@ -89,7 +89,7 @@ Installation
 ============
 
 To install the pgtt extension you need at least a PostgreSQL version
-9.4. Untar the pgtt tarball anywhere you want then you'll need to
+9.5. Untar the pgtt tarball anywhere you want then you'll need to
 compile it with pgxs.  The `pg_config` tool must be in your path.
 
 Depending on your installation, you may need to install some devel
