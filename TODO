@@ -1,0 +1,2 @@
+- Add regression test of privileges on CREATE GLOBAL TEMPORARY TABLE
+
