@@ -1,5 +1,10 @@
-PostgreSQL Global Temporary Tables
-==================================
+* [Installation](#installation)
+* [Configuration](#configuration)
+* [Use of the extension](#use-of-the-extension)
+* [Performances](performances)
+* [Authors](#authors)
+
+## PostgreSQL Global Temporary Tables
 
 pgtt is a PostgreSQL extension to create, manage and use Oracle-style
 Global Temporary Tables and probably the others RDBMS.
@@ -91,8 +96,7 @@ supported. Creation or dropping of the Global Temporary Table are
 logged, see below "How the extension really works?" for the details.
 
 
-Installation
-============
+### [Installation](#installation)
 
 To install the pgtt extension you need at least a PostgreSQL version
 9.5. Untar the pgtt tarball anywhere you want then you'll need to
@@ -131,11 +135,9 @@ Then the tests can be executed using:
 	diff t/results/relocation.out t/expected/relocation.out
 
 
-Configuration
-=============
+### [Configuration](#configuration)
 
-pgtt.enabled
-------------
+#### pgtt.enabled
 
 The extension can be enable / disable using this GUC, default is
 enabled. To disable the extension use:
@@ -144,8 +146,7 @@ enabled. To disable the extension use:
 
 You can disable or enable the extension at any moment in a session.
 
-Use of the extension
-====================
+### [Use of the extension](#use-of-the-extension)
 
 In all database where you want to use Global Temporary Tables you
 will have to create the extension using:
@@ -239,11 +240,9 @@ You can create indexes on the global temporary table:
 just like with any other tables.
 
 
-How the extension really works?
-===============================
+### [How the extension really works](#how-the-extension-really-works)
 
-Global Temporary Table use
---------------------------
+#### Global Temporary Table use
 
 When `pgtt.enabled` is true (default) and the extension have been
 loaded (`LOAD 'pgtt';`) the first access to the table using a SELECT,
@@ -340,8 +339,7 @@ create immediately the associated temporary table filled with all data
 returned by the SELECT statement. The firt access will not have to
 create the table it already exists with data.
 
-Table creation
---------------
+#### Table creation
 
 The extension intercept the call to `CREATE TEMPORARY TABLE ...`
 statement and look if there is the keyword `GLOBAL` or the comment
@@ -376,8 +374,7 @@ Index :
 * `code`: code used at Global Temporary Table creation time.
 
 
-Table removing
---------------
+#### Table removing
 
 The extension intercept the call to `DROP TABLE` and look in the
 `pg_global_temp_tables` table to see if it is declared. When it is
@@ -390,8 +387,7 @@ Dropping a GTT that is in use, when the temporary table has already
 been created, will raise an error. This is not allowed.
 
 
-Table renaming
---------------
+#### Table renaming
 
 The extension intercept the call to `ALTER TABLE ... RENAME` and look
 in the `pg_global_temp_tables` table to see if it is declared. When it
@@ -406,16 +402,14 @@ When `pgtt.enabled` is false nothing is done.
 Renaming a GTT that is in use, when the temporary table has already
 been created, will raise an error. This is not allowed.
 
-pg_dump / pg_restore
---------------------
+#### pg_dump / pg_restore
 
 When dumping a database using the pgtt extension, the content of the
 "catalog" table `pg_global_temp_tables` will be dumped as well as
 all template unlogged tables. Restoring the dump will recreate the
 database in the same state.
 
-Performances
-============
+### [Performances](performances)
 
 Overhead of loading the extension but without using it in a pgbench
 tpcb-like scenario.
@@ -496,14 +490,12 @@ tps = 291.993502 (including connections establishing)
 tps = 292.028832 (excluding connections establishing)
 ```
 
-Authors
-=======
+### [Authors](#authors)
 
 Gilles Darold
 gilles@darold.net
 
-License
-=======
+### [License](#license)
 
 This extension is free software distributed under the PostgreSQL
 Licence.
