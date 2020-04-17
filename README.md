@@ -236,23 +236,60 @@ Note that rerouting is active even if you add a namespace qualifier
 to the table. For example looking at the internal unlogged template
 table:
 
-    SELECT * FROM pgtt_schema.t1;
+	bench=# LOAD 'pgtt';
+	LOAD
+	bench=# CREATE /*GLOBAL*/ TEMPORARY TABLE test_tt (id int, lbl text) ON COMMIT PRESERVE ROWS;
+	CREATE TABLE
+	bench=# INSERT INTO test_tt VALUES (1, 'one'), (2, 'two'), (3, 'three');
+	INSERT 0 3
+	bench=# SELECT * FROM pgtt_schema.test_tt;
+	 id |  lbl  
+	----+-------
+	  1 | one
+	  2 | two
+	  3 | three
+	(3 rows)
 
 will actually result in the same as looking at the associated
 temporary table like follow:
 
-    SELECT * FROM t1;
+	bench=# SELECT * FROM test_tt;
+	 id |  lbl  
+	----+-------
+	  1 | one
+	  2 | two
+	  3 | three
+	(3 rows)
 
 or
 
-    SELECT * FROM pg_temp.t1;
+	bench=# SELECT * FROM pg_temp.test_tt;
+	 id |  lbl  
+	----+-------
+	  1 | one
+	  2 | two
+	  3 | three
+	(3 rows)
 
 If you want to really look at the template table to be sure that
 it contains no rows, you must disable the extension rerouting:
 
-    SET pgtt.enable TO off;
-    SELECT * FROM pgtt_schema.t1;
-    SET pgtt.enable TO on;
+	bench=# SET pgtt.enabled TO off;
+	SET
+	bench=# SELECT * FROM pgtt_schema.test_tt;
+	 id | lbl 
+	----+-----
+	(0 rows)
+
+	bench=# SET pgtt.enabled TO on;
+	SET
+	bench=# SELECT * FROM pgtt_schema.test_tt;
+	 id |  lbl  
+	----+-------
+	  1 | one
+	  2 | two
+	  3 | three
+	(3 rows)
 
 Look at test file for more examples.
 
