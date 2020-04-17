@@ -54,7 +54,7 @@ ALTER TABLE t_glob_temptable2 RENAME TO t_glob_temptable1;
 
 \c - -
 
-LOAD 'pgtt'
+LOAD 'pgtt';
 
 ALTER TABLE t_glob_temptable2 RENAME TO t_glob_temptable1;
 

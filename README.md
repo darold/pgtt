@@ -2,7 +2,7 @@ PostgreSQL Global Temporary Tables
 ==================================
 
 pgtt is a PostgreSQL extension to create, manage and use Oracle-style
-Global Temporary Tables and probably also BD2-style.
+Global Temporary Tables and probably the others RDBMS.
 
 The objective of this extension it to propose an extension to provide
 the Global Temporary Table feature waiting for an in core
@@ -126,7 +126,7 @@ pgtt.enabled
 The extension can be enable / disable using this GUC, defaut is
 enabled. To disable the extension use:
 
-	SET pgtt.enabled TO false;
+	SET pgtt.enabled TO off;
 
 You can disable or enable the extension at any moment in a session.
 
@@ -183,16 +183,18 @@ it like a comment instead:
 
 the extension will detect it.
 
-As you can see in the exemple above the LIKE clause supported as well
-as the AS clause WITH DATA or WITH NO DATA (default):
+As you can see in the example above the LIKE clause is supported,
+as well as the AS clause WITH DATA or WITH NO DATA (default):
 
 	CREATE /*GLOBAL*/ TEMPORARY TABLE test_gtt_table
 	AS SELECT * FROM source_table WITH DATA;
 
 PostgreSQL temporary table clause `ON COMMIT DROP` is not supported by
 the extension, GTT are persistent over transactions. If the clause is
-used an error will be raised. Only the table rows are deleted or
-preserved following the clause:
+used an error will be raised.
+
+Temporary table rows are deleted or preserved at transactions commit
+following the clause:
 
 	ON COMMIT { PRESERVE | DELETE } ROWS
 
@@ -216,16 +218,19 @@ Global Temporary Table use
 
 When `pgtt.enabled` is true (default) and the extension have been
 loaded (`LOAD 'pgtt';`) the first access to the table using a SELECT,
-UPDATE or DELETE statement will raise the creation of a temporary
-table using the definition of the "template" table created when
-issuing the `CREATE GLOBAL TEMPORARY TABLE` statement. Once it is
-done the statement will be rerouted to the newly created temporary
-table. All other access will use the new temporary table, the
-`pg_temp*` schema where the table is created is always looked first
-in the search path.
+UPDATE or DELETE statement will produce the creation of a temporary
+table using the definition of the "template" table created during
+the call to `CREATE GLOBAL TEMPORARY TABLE` statement.
+
+Once the temporary table is created at the first acces, the original
+SELECT, UPDATE or DELETE statement is automatically rerouted to the
+new regular temporary table. All other access will use the new
+temporary table, the `pg_temp*` schema where the table is created is
+always looked first in the search path this is why the "template"
+table is not concerned by subsequent access.
 
 Creating, renaming and removing a GTT is an administration task it
-shall not be done in a application session.
+shall not be done in an application session.
 
 Note that rerouting is active even if you add a namespace qualifier
 to the table. For example looking at the internal unlogged template
@@ -237,10 +242,13 @@ will actually result in the same as looking at the associated
 temporary table like follow:
 
     SELECT * FROM t1;
+
+or
+
     SELECT * FROM pg_temp.t1;
 
-If you want to really look at the template table to be sure that it
-contains no rows, you must disable the extension rerouting:
+If you want to really look at the template table to be sure that
+it contains no rows, you must disable the extension rerouting:
 
     SET pgtt.enable TO off;
     SELECT * FROM pgtt_schema.t1;
@@ -330,6 +338,87 @@ When dumping a database using the pgtt extension, the content of the
 all template unlogged tables. Restoring the dump will recreate the
 database in the same state.
 
+Performences
+============
+
+Overhead of loading the extension but without using it in a pgbench
+tpcb-like scenario.
+
+* Without loading the extension
+
+```
+$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f t/bench/bench_noload.sql
+starting vacuum...end.
+transaction type: t/bench/bench_noload.sql
+scaling factor: 1
+query mode: simple
+number of clients: 20
+number of threads: 4
+duration: 60 s
+number of transactions actually processed: 51741
+latency average = 23.201 ms
+tps = 862.038042 (including connections establishing)
+tps = 862.165341 (excluding connections establishing)
+```
+
+* With loading the extension
+
+```
+$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f t/bench/bench_load.sql
+starting vacuum...end.
+transaction type: t/bench/bench_load.sql
+scaling factor: 1
+query mode: simple
+number of clients: 20
+number of threads: 4
+duration: 60 s
+number of transactions actually processed: 51171
+latency average = 23.461 ms
+tps = 852.495877 (including connections establishing)
+tps = 852.599010 (excluding connections establishing)
+```
+
+Now a test between using a regular temporary table and a PGTT in the
+pgbench tpcb-like scenario.
+
+* Using a regular Temporary Table
+
+```
+$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f t/bench/bench_use_rtt.sql 
+starting vacuum...end.
+transaction type: t/bench/bench_use_rtt.sql
+scaling factor: 1
+query mode: simple
+number of clients: 20
+number of threads: 4
+duration: 60 s
+number of transactions actually processed: 17153
+latency average = 70.058 ms
+tps = 285.477860 (including connections establishing)
+tps = 285.514186 (excluding connections establishing)
+```
+
+* Using a Global Temporary Table
+
+Created using:
+
+	CREATE GLOBAL TEMPORARY TABLE test_tt (id int, lbl text)
+			ON COMMIT DELETE ROWS;
+
+```
+$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f t/bench/bench_use_gtt.sql 
+starting vacuum...end.
+transaction type: t/bench/bench_use_gtt.sql
+scaling factor: 1
+query mode: simple
+number of clients: 20
+number of threads: 4
+duration: 60 s
+number of transactions actually processed: 17540
+latency average = 68.495 ms
+tps = 291.993502 (including connections establishing)
+tps = 292.028832 (excluding connections establishing)
+```
 
 Authors
 =======

@@ -20,8 +20,8 @@ SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespa
 
 BEGIN;
 
--- Truncate first will not create the temporary table,
--- truncate will be operated on the "template" table
+-- Truncate first will not create the temporary table, it will
+-- be operated on the "template" table which will do nothing.
 TRUNCATE t_glob_temptable1;
 
 -- Look if we have two tables now
