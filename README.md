@@ -2,6 +2,7 @@
 * [Installation](#installation)
 * [Configuration](#configuration)
 * [Use of the extension](#use-of-the-extension)
+* [How the extension really works](#how-the-extension-really-works)
 * [Performances](performances)
 * [Authors](#authors)
 
@@ -243,7 +244,7 @@ You can create indexes on the global temporary table:
 just like with any other tables.
 
 
-### [How the extension really works](#how-the-extension-really-works)
+### [How the extension really works](#how-the-extension-really-works)
 
 #### Global Temporary Table use
 
