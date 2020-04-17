@@ -114,7 +114,6 @@ bool pgtt_is_enabled = true;
 
 /* Regular expression search */
 static regex_t create_global_regexv;
-static regex_t create_as_regexv;
 
 /* Oid and name of pgtt extrension schema in the database */
 Oid pgtt_namespace_oid = InvalidOid;
@@ -246,11 +245,6 @@ _PG_init(void)
 					REG_NOSUB|REG_EXTENDED|REG_NEWLINE|REG_ICASE) != 0)
 		ereport(ERROR, (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 			errmsg("PGTT: invalid statement regexp pattern %s", "^\\s*CREATE\\s+(\\/\\*\\s*)?GLOBAL(\\s*\\*\\/)?\\s+")));
-	/* Regexp to find CREATE GLOBAL TEMPORARY TABLE ... AS SELECT*/
-	if (regcomp(&create_as_regexv, "^\\s*CREATE\\s+(\\/\\*\\s*)?GLOBAL(\\s*\\*\\/)?\\s+TEMPORARY\\s+TABLE\\s+(.*)?\\s+AS\\s+SELECT",
-					REG_NOSUB|REG_EXTENDED|REG_NEWLINE|REG_ICASE) != 0)
-		ereport(ERROR, (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-			errmsg("PGTT: invalid statement regexp pattern %s", "^\\s*CREATE\\s+(\\/\\*\\s*)?GLOBAL(\\s*\\*\\/)?\\s+TEMPORARY\\s+TABLE\\s+(.*)\\s+?AS\\s+SELECT")));
 
 	if (GttHashTable == NULL)
 	{
@@ -309,7 +303,6 @@ exitHook(int code, Datum arg)
 
 	/* Freeing precompiled regex */
 	regfree(&create_global_regexv);
-	regfree(&create_as_regexv);
 }
 
 static void
@@ -1098,16 +1091,17 @@ GetGttByName(const char *name)
 static void
 gtt_load_global_temporary_tables(void)
 {
-	RangeVar     *rv;
-	Relation      rel;
+	RangeVar       *rv;
+	Relation       rel;
 #if (PG_VERSION_NUM >= 120000)
-	TableScanDesc   scan;
+	TableScanDesc  scan;
 #else
 	HeapScanDesc   scan;
 #endif
 	HeapTuple     tuple;
-	int numberOfAttributes;
-	TupleDesc tupleDesc;
+	int           numberOfAttributes;
+	TupleDesc     tupleDesc;
+	Snapshot      snapshot;
 
 	elog(DEBUG1, "gtt_load_global_temporary_tables()");
 
@@ -1117,12 +1111,14 @@ gtt_load_global_temporary_tables(void)
 	rv = makeRangeVar(pgtt_namespace_name, CATALOG_GLOBAL_TEMP_REL, -1);
 	/* Open the CATALOG_GLOBAL_TEMP_REL table. We don't want to allow
 	 * writable accesses by other session during import. */
+	snapshot = GetActiveSnapshot();
+	//snapshot = GetTransactionSnapshot();
 #if (PG_VERSION_NUM >= 120000)
 	rel = table_openrv(rv, AccessShareLock);
-        scan = table_beginscan(rel, GetActiveSnapshot(), 0, (ScanKey) NULL);
+        scan = table_beginscan(rel, snapshot, 0, (ScanKey) NULL);
 #else
 	rel = heap_openrv(rv, AccessShareLock);
-        scan = heap_beginscan(rel, GetActiveSnapshot(), 0, (ScanKey) NULL);
+        scan = heap_beginscan(rel, snapshot, 0, (ScanKey) NULL);
 #endif
 	tupleDesc = RelationGetDescr(rel);
 	numberOfAttributes = tupleDesc->natts;
