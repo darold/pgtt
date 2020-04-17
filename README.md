@@ -1,3 +1,4 @@
+* [Description](#description)
 * [Installation](#installation)
 * [Configuration](#configuration)
 * [Use of the extension](#use-of-the-extension)
@@ -6,8 +7,10 @@
 
 ## PostgreSQL Global Temporary Tables
 
+### [Description](#description)
+
 pgtt is a PostgreSQL extension to create, manage and use Oracle-style
-Global Temporary Tables and probably the others RDBMS.
+Global Temporary Tables and the others RDBMS.
 
 The objective of this extension it to propose an extension to provide
 the Global Temporary Table feature waiting for an in core
@@ -495,7 +498,7 @@ tps = 292.028832 (excluding connections establishing)
 Gilles Darold
 gilles@darold.net
 
-### [License](#license)
+### [License](#license)
 
 This extension is free software distributed under the PostgreSQL
 Licence.
