@@ -30,7 +30,7 @@ creates and drops a lot of temporary tables, the PostgreSQL catalogs
 becomes bloated and the performances start to fall. Usually Global
 Temporary Tables prevent catalog bloating, but with this implementation
 and even if we have a permanent table, all DML are rerouted to a
-regular temporary table created at first acces. See below chapter
+regular temporary table created at first access. See below chapter
 "How the extension really works?" for more information.
 
 DECLARE TEMPORARY TABLE statement is not supported by PostgreSQL and
@@ -123,7 +123,7 @@ Configuration
 pgtt.enabled
 ------------
 
-The extension can be enable / disable using this GUC, defaut is
+The extension can be enable / disable using this GUC, default is
 enabled. To disable the extension use:
 
 	SET pgtt.enabled TO off;
@@ -222,7 +222,7 @@ UPDATE or DELETE statement will produce the creation of a temporary
 table using the definition of the "template" table created during
 the call to `CREATE GLOBAL TEMPORARY TABLE` statement.
 
-Once the temporary table is created at the first acces, the original
+Once the temporary table is created at the first access, the original
 SELECT, UPDATE or DELETE statement is automatically rerouted to the
 new regular temporary table. All other access will use the new
 temporary table, the `pg_temp*` schema where the table is created is
@@ -258,7 +258,7 @@ Look at test file for more examples.
 
 This also mean that you can relocated the extension in a dedicated
 namespace. Can be useful if your application's queries use the schema
-qualifier with the table name to acces to the GTT and you can't change
+qualifier with the table name to access to the GTT and you can't change
 it. See t/sql/relocation.sql for an example. By default the extension
 is not relocatable in an other schema, there is some configuration
 change to perform to be able to use this feature.
@@ -327,7 +327,7 @@ to be renamed.
 
 When `pgtt.enabled` is false nothing is done.
 
-Remaming a GTT that is in use, when the temporary table has already
+Renaming a GTT that is in use, when the temporary table has already
 been created, will raise an error. This is not allowed.
 
 pg_dump / pg_restore
@@ -338,7 +338,7 @@ When dumping a database using the pgtt extension, the content of the
 all template unlogged tables. Restoring the dump will recreate the
 database in the same state.
 
-Performences
+Performances
 ============
 
 Overhead of loading the extension but without using it in a pgbench
