@@ -11,6 +11,12 @@ Oracle behavior with GTT when you can not or don't want to rewrite the
 application code when migrating to PostrgeSQL. In all other case best
 is to rewrite the code to use standard PostgreSQL temporary tables.
 
+This version of the GTT extension use a regular unlogged table as
+"template" table and an internal rerouting to a temporary table. See
+chapter "How the extension really works?" for more details. A previous
+implementation of this extension using Row Security Level is still
+available [here](https://github.com/darold/pgtt-rsl).
+
 PostgreSQL native temporary tables are automatically dropped at the
 end of a session, or optionally at the end of the current transaction.
 Global Temporary Tables (GTT) are permanent, they are created
