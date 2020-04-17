@@ -20,8 +20,6 @@ MODULES = pgtt
 
 DATA = $(wildcard updates/*--*.sql) sql/$(EXTENSION)--$(EXTVERSION).sql
 
-SCHEMA = "SESSION"
-
 else
 	$(error Minimum version of PostgreSQL required is 9.4)
 endif

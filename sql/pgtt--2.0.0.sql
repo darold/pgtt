@@ -6,6 +6,7 @@
 ----
 CREATE SCHEMA IF NOT EXISTS @extschema@;
 REVOKE ALL ON SCHEMA @extschema@ FROM PUBLIC;
+GRANT USAGE ON SCHEMA @extschema@ TO PUBLIC;
 
 ----
 -- Table used to store information about Global Temporary Tables.

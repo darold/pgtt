@@ -104,6 +104,14 @@ package. Once `pg_config` is in your path, do
 	make
 	sudo make install
 
+If the extension will be used by a non-superuser role, you need to
+add the library to the $libdir/plugins/ directory.
+
+	export libdir=$(pg_config --pkglibdir)
+	sudo mkdir $libdir/plugins/
+	cd $libdir/plugins/
+	sudo ln -s ../pgtt.so
+	
 To run test execute the following command:
 
 	prove
@@ -144,11 +152,23 @@ will have to create the extension using:
 
 	CREATE EXTENSION pgtt;
 
+As a superuser you can load the extension using:
+
+	LOAD 'pgtt';
+
+non-superuser must load the library using the plugins/ directory
+as follow:
+
+	LOAD '$libdir/plugins/pgtt';
+
+Take care to follow installation instruction above to create the
+symlink from the plugins/ directory to the extension library file.
+
 The pgtt extension use a dedicated schema to store related objects,
 by default: `pgtt_schema`. The extension take care that this schema
 is always at end of the `search_path`.
 
-	gtt_testdb=# LOAD 'pgtt';
+	gtt_testdb=# LOAD '$libdir/plugins/pgtt';
 	LOAD
 	gtt_testdb=# SHOW search_path;
 	    search_path     
@@ -187,7 +207,7 @@ it like a comment instead:
 		LIKE other_table
 	) ON COMMIT { PRESERVE | DELETE } ROWS;
 
-the extension will detect it.
+the extension will detect the GLOBAL keyword.
 
 As you can see in the example above the LIKE clause is supported,
 as well as the AS clause WITH DATA or WITH NO DATA (default):
@@ -195,6 +215,9 @@ as well as the AS clause WITH DATA or WITH NO DATA (default):
 	CREATE /*GLOBAL*/ TEMPORARY TABLE test_gtt_table
 	AS SELECT * FROM source_table WITH DATA;
 
+In case of WITH DATA, the extension will fill the GTT with data
+returned from the SELECT statement for the current session only.
+ 
 PostgreSQL temporary table clause `ON COMMIT DROP` is not supported by
 the extension, GTT are persistent over transactions. If the clause is
 used an error will be raised.
@@ -306,6 +329,16 @@ it. See t/sql/relocation.sql for an example. By default the extension
 is not relocatable in an other schema, there is some configuration
 change to perform to be able to use this feature.
 
+If you use the CREATE AS form with the WITH DATA clause like in this
+example:
+
+	CREATE /*GLOBAL*/ TEMPORARY TABLE test_gtt_table
+	AS SELECT * FROM source_table WITH DATA;
+
+the extension will first create the template unlogged table and will
+create immediately the associated temporary table filled with all data
+returned by the SELECT statement. The firt access will not have to
+create the table it already exists with data.
 
 Table creation
 --------------
