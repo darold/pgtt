@@ -62,3 +62,10 @@ SELECT * FROM t_glob_temptable1;
 -- Both tables muste exists
 SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
 
+-- Reconnect and drop it
+\c - -
+LOAD 'pgtt';
+
+-- Cleanup
+DROP TABLE t_glob_temptable1;
+

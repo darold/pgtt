@@ -1,13 +1,23 @@
 ----
 -- Regression test to Global Temporary Table implementation
 --
+-- This test is not part of the regression tests run with
+-- make check install because it need manual changes.
+--
 -- Test for extension relocation and use of schema qualifier.
 -- For this test 'schema' and 'relocatable' must be commented
--- in the extension's control file.
+-- in the extension's control file. Then execute:
+--
+--    createdb gtt_relocation
+--    psql -d gtt_relocation -f test/relocation.sql > results/relocation.out 2>&1
+--    diff results/relocation.out test/expected/relocation.out
+--    dropdb gtt_relocation
+--
 ----
 
-DROP EXTENSION pgtt CASCADE;
-DROP SCHEMA "SESSION" CASCADE;
+-- DROP EXTENSION pgtt CASCADE;
+-- DROP SCHEMA "SESSION" CASCADE;
+
 CREATE SCHEMA "SESSION";
 CREATE EXTENSION pgtt SCHEMA "SESSION";
 

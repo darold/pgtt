@@ -120,9 +120,9 @@ add the library to the $libdir/plugins/ directory.
 	cd $libdir/plugins/
 	sudo ln -s ../pgtt.so
 	
-To run test execute the following command:
+To run test execute the following command as superuser:
 
-	prove
+	make installcheck
 
 An additional standalone test is provided to test the use of the
 extension in a dedicated schema "SESSION". The requisite is to
@@ -133,10 +133,11 @@ remove these two lines from the pgtt.control file:
 
 Then the tests can be executed using:
 
-	dropdb gtt_testdb
-	createdb gtt_testdb
-	psql gtt_testdb -f t/sql/relocation.sql > t/results/relocation.out 2>&1
-	diff t/results/relocation.out t/expected/relocation.out
+	mkdir results
+	createdb gtt_relocation
+	psql -d gtt_relocation -f test/relocation.sql > results/relocation.out 2>&1
+	diff results/relocation.out test/expected/relocation.out
+	dropdb gtt_relocation
 
 
 ### [Configuration](#configuration)

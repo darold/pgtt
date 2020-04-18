@@ -38,3 +38,10 @@ INSERT INTO t_glob_temptable1 VALUES (2, 'two');
 
 SELECT * FROM t_glob_temptable1 WHERE id = 2;
 
+-- Reconnect and drop it
+\c - -
+LOAD 'pgtt';
+
+-- Cleanup
+DROP TABLE t_glob_temptable1;
+

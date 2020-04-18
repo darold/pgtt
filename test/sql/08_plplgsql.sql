@@ -58,3 +58,11 @@ SELECT test_temp_table();
 -- Look at temporary table content
 SELECT * FROM t_glob_temptable1;
 
+-- Reconnect and drop it
+\c - -
+LOAD 'pgtt';
+
+-- Cleanup
+DROP TABLE t_glob_temptable1;
+
+DROP FUNCTION test_temp_table();

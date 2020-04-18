@@ -20,6 +20,14 @@ MODULES = pgtt
 
 DATA = $(wildcard updates/*--*.sql) sql/$(EXTENSION)--$(EXTVERSION).sql
 
+TESTS        = 00_init 01_oncommitdelete 02_oncommitpreserve \
+	       03_createontruncate 04_rename 05_useindex \
+	       06_createas 07_createlike 08_plplgsql \
+	       09_transaction
+
+REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
+REGRESS_OPTS = --inputdir=test
+
 else
 	$(error Minimum version of PostgreSQL required is 9.4)
 endif

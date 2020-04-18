@@ -46,3 +46,10 @@ TRUNCATE t_glob_temptable1;
 
 SELECT * FROM t_glob_temptable1;
 
+-- Reconnect and drop it
+\c - -
+LOAD 'pgtt';
+
+-- Cleanup
+DROP TABLE t_glob_temptable1;
+

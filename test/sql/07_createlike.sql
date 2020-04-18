@@ -5,9 +5,6 @@
 --
 ----
 
--- Create a regular table with some rows
-CREATE TABLE source (id integer, lbl varchar);
-
 -- Import the library
 LOAD 'pgtt';
 
@@ -38,4 +35,11 @@ SELECT * FROM t_glob_temptable1;
 COMMIT;
 
 SELECT * FROM t_glob_temptable1;
+
+-- Reconnect and drop it
+\c - -
+LOAD 'pgtt';
+
+-- Cleanup
+DROP TABLE t_glob_temptable1;
 
