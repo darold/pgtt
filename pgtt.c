@@ -929,10 +929,10 @@ gtt_create_table_statement(Gtt gtt)
 	/* Get Oid of the newly created table */
 	newQueryString = psprintf("SELECT c.relfilenode FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE c.relname='%s' AND n.nspname = '%s'",
 			gtt.relname,
-			quote_identifier(pgtt_namespace_name));
+			pgtt_namespace_name);
 
         result = SPI_exec(newQueryString, 0);
-        if (result != SPI_OK_SELECT)
+        if (result != SPI_OK_SELECT && SPI_processed != 1)
                 ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 	oidDatum = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isnull);
@@ -1612,10 +1612,10 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 	/* Get Oid of the newly created table */
 	newQueryString = psprintf("SELECT c.relfilenode FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE c.relname='%s' AND n.nspname = '%s'",
 			gtt.relname,
-			quote_identifier(pgtt_namespace_name));
+			pgtt_namespace_name);
 
         result = SPI_exec(newQueryString, 0);
-        if (result != SPI_OK_SELECT)
+        if (result != SPI_OK_SELECT && SPI_processed != 1)
                 ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 	oidDatum = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isnull);
@@ -1651,7 +1651,7 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 				namespaceName);
 
 		result = SPI_exec(newQueryString, 0);
-		if (result != SPI_OK_SELECT)
+		if (result != SPI_OK_SELECT && SPI_processed != 1)
 			ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 		oidDatum = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isnull);
