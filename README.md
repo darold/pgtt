@@ -210,7 +210,10 @@ If you don't want to be annoyed by this warning message you can use
 it like a comment instead:
 
 	CREATE /*GLOBAL*/ TEMPORARY TABLE test_gtt_table (
-		LIKE other_table
+		LIKE other_table LIKE
+		INCLUDING DEFAULTS
+		INCLUDING CONSTRAINTS
+		INCLUDING INDEXES
 	) ON COMMIT { PRESERVE | DELETE } ROWS;
 
 the extension will detect the GLOBAL keyword.
@@ -422,9 +425,9 @@ tpcb-like scenario.
 * Without loading the extension
 
 ```
-$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f t/bench/bench_noload.sql
+$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f test/bench/bench_noload.sql
 starting vacuum...end.
-transaction type: t/bench/bench_noload.sql
+transaction type: test/bench/bench_noload.sql
 scaling factor: 1
 query mode: simple
 number of clients: 20
@@ -439,9 +442,9 @@ tps = 862.165341 (excluding connections establishing)
 * With loading the extension
 
 ```
-$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f t/bench/bench_load.sql
+$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f test/bench/bench_load.sql
 starting vacuum...end.
-transaction type: t/bench/bench_load.sql
+transaction type: test/bench/bench_load.sql
 scaling factor: 1
 query mode: simple
 number of clients: 20
@@ -459,9 +462,9 @@ pgbench tpcb-like scenario.
 * Using a regular Temporary Table
 
 ```
-$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f t/bench/bench_use_rtt.sql 
+$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f test/bench/bench_use_rtt.sql 
 starting vacuum...end.
-transaction type: t/bench/bench_use_rtt.sql
+transaction type: test/bench/bench_use_rtt.sql
 scaling factor: 1
 query mode: simple
 number of clients: 20
@@ -481,9 +484,9 @@ Created using:
 			ON COMMIT DELETE ROWS;
 
 ```
-$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f t/bench/bench_use_gtt.sql 
+$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f test/bench/bench_use_gtt.sql 
 starting vacuum...end.
-transaction type: t/bench/bench_use_gtt.sql
+transaction type: test/bench/bench_use_gtt.sql
 scaling factor: 1
 query mode: simple
 number of clients: 20
@@ -494,6 +497,10 @@ latency average = 68.495 ms
 tps = 291.993502 (including connections establishing)
 tps = 292.028832 (excluding connections establishing)
 ```
+
+Even if this last test shows a significant performances improvement
+comparing to regular temporary tables, most of the time this will
+not be the case. 
 
 ### [Authors](#authors)
 

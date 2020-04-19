@@ -20,6 +20,7 @@ CREATE TABLE @extschema@.pg_global_temp_tables (
 	code text,
 	UNIQUE (nspname, relname)
 );
+GRANT ALL ON TABLE @extschema@.pg_global_temp_tables TO PUBLIC;
 
 -- Include tables into pg_dump
 SELECT pg_catalog.pg_extension_config_dump('pg_global_temp_tables', '');

@@ -24,7 +24,7 @@ SELECT * FROM pgtt_schema.t_glob_temptable1;
 SET pgtt.enabled TO on;
 
 -- Look at the temporary table itself, it must have the rows
-SELECT * FROM t_glob_temptable1;
+SELECT * FROM t_glob_temptable1 ORDER BY id;
 
 BEGIN;
 
@@ -37,11 +37,11 @@ SELECT * FROM pgtt_schema.t_glob_temptable1;
 SET pgtt.enabled TO on;
 
 -- Look at content of the Global Temporary Table
-SELECT * FROM t_glob_temptable1;
+SELECT * FROM t_glob_temptable1 ORDER BY id;
 
 COMMIT;
 
-SELECT * FROM t_glob_temptable1;
+SELECT * FROM t_glob_temptable1 ORDER BY id;
 
 -- Reconnect and drop it
 \c - -
