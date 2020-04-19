@@ -8,8 +8,9 @@
 -- For this test 'schema' and 'relocatable' must be commented
 -- in the extension's control file. Then execute:
 --
+--    dropdb gtt_relocation
 --    createdb gtt_relocation
---    psql -d gtt_relocation -f test/relocation.sql > results/relocation.out 2>&1
+--    LANG=C psql -d gtt_relocation -f test/relocation.sql > results/relocation.out 2>&1
 --    diff results/relocation.out test/expected/relocation.out
 --    dropdb gtt_relocation
 --

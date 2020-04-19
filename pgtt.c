@@ -958,6 +958,15 @@ gtt_create_table_statement(Gtt gtt)
         if (result < 0)
                 ereport(ERROR, (errmsg("can not registrer new global temporary table")));
 
+	/* Set privilege on the unlogged table */
+	newQueryString = psprintf("GRANT ALL ON TABLE %s.%s TO public",
+			quote_identifier(pgtt_namespace_name),
+			quote_identifier(gtt.relname));
+        result = SPI_exec(newQueryString, 0);
+        if (result < 0)
+                ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
+
+
 	/* Mark the GTT as been created before register the table in the cache */
 	gtt.created = true;
 
