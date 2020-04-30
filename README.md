@@ -142,7 +142,7 @@ Then the tests can be executed using:
 
 ### [Configuration](#configuration)
 
-#### pgtt.enabled
+- *pgtt.enabled*
 
 The extension can be enable / disable using this GUC, default is
 enabled. To disable the extension use:
