@@ -34,6 +34,7 @@
 #include "commands/defrem.h"
 #include "commands/extension.h"
 #include "commands/tablecmds.h"
+#include "commands/comment.h"
 #include "executor/spi.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodes.h"
@@ -758,6 +759,50 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			break;
 		}
 
+		case T_CommentStmt:
+		{
+			/* COMMENT ON TABLE/COLUMN statement */
+			CommentStmt   *stmt = (CommentStmt *)parsetree;
+			List          *object = castNode(List, stmt->object);
+			Gtt           gtt;
+			List          *relname;
+			Relation      relation;
+			char          *nspname;
+
+			/* We only take care of tabe renaming to update our internal storage */
+			if (stmt->objtype != OBJECT_TABLE && stmt->objtype != OBJECT_COLUMN)
+				break;
+
+			if (stmt->objtype == OBJECT_COLUMN)
+				relname = list_truncate(list_copy(object), list_length(object) - 1);
+			else
+				relname = list_truncate(list_copy(object), list_length(object));
+
+			if (!relname)
+				break;
+
+			relation = relation_openrv(makeRangeVarFromNameList(relname), NoLock);
+			nspname = get_namespace_name(RelationGetNamespace(relation));
+
+			if (strcmp(nspname, pgtt_namespace_name) != 0)
+			{
+				if (strstr(nspname, "pg_temp") != NULL)
+					elog(ERROR, "a temporary table has been created and is active, can not add a comment on the GTT table in this session.");
+				break;
+			}
+
+			gtt.relid = 0;
+			/* Look if the table is declared as GTT */
+			GttHashTableLookup(RelationGetRelationName(relation), gtt);
+			relation_close(relation, NoLock);
+
+			/* Not registered as a GTT, nothing to do here */
+			if (gtt.relid == 0)
+				break;
+
+			break;
+		}
+
 		default:
 			break;
 	}
@@ -1210,7 +1255,12 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
         /* Initialize TableLikeClause structure */
         NodeSetTag(&like_clause, T_TableLikeClause);
         like_clause.relation            = copyObject(parent_rv);
-        like_clause.options             = CREATE_TABLE_LIKE_DEFAULTS | CREATE_TABLE_LIKE_INDEXES;
+        like_clause.options             = CREATE_TABLE_LIKE_DEFAULTS
+						| CREATE_TABLE_LIKE_INDEXES
+						| CREATE_TABLE_LIKE_CONSTRAINTS
+						| CREATE_TABLE_LIKE_IDENTITY
+						| CREATE_TABLE_LIKE_GENERATED
+						| CREATE_TABLE_LIKE_COMMENTS;
 
 	elog(DEBUG1, "Initialize CreateStmt structure");
         /* Initialize CreateStmt structure */
@@ -1314,6 +1364,10 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 #endif
 						false,  /* skip_build */
 						false); /* quiet */
+		}
+		else if (IsA(cur_stmt, CommentStmt))
+		{
+			CommentObject((CommentStmt *) cur_stmt);
 		}
 		else
 		{
