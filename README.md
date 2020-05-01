@@ -193,6 +193,8 @@ is always at end of the `search_path`.
 The pgtt schema is automatically added to the search_path when you
 load the extension and if you change the `search_path` later.
 
+#### Create a Global Temporary Table
+
 To create a GTT table named "test_table" use the following statement:
 
 	CREATE GLOBAL TEMPORARY TABLE test_gtt_table (
@@ -236,10 +238,16 @@ following the clause:
 
 	ON COMMIT { PRESERVE | DELETE } ROWS
 
+#### Drop a Global Temporary Table
+
 To drop a Global Temporary Table you just proceed as for a normal
 table:
 
 	DROP TABLE test_gtt_table;
+
+A Global Temporary Table can be dropped even if it is used by other session.
+
+#### Create index on Global Temporary Table
 
 You can create indexes on the global temporary table:
 
@@ -247,16 +255,27 @@ You can create indexes on the global temporary table:
 
 just like with any other tables.
 
+#### Constraints on Global Temporary Table
+
+You can add any constraint on a Global Temporary Table except FOREIGN KEYS.
+
+	CREATE GLOBAL TEMPORARY TABLE t2 (
+		c1 serial PRIMARY KEY,
+		c2 VARCHAR (50) UNIQUE NOT NULL,
+		c3 boolean DEFAULT false
+	)
+
 The use of FOREIGN KEYS in a Global Temporary Table is not allowed.
 
-	CREATE GLOBAL TEMPORARY TABLE t2 (c1 integer, FOREIGN KEY (c1) REFERENCES source (id));
+	CREATE GLOBAL TEMPORARY TABLE t1 (c1 integer, FOREIGN KEY (c1) REFERENCES source (id));
 	ERROR:  attempt to create referential integrity constraint on global temporary table
 
 	ALTER TABLE t2 ADD FOREIGN KEY (c1) REFERENCES source (id);
 	ERROR:  attempt to create referential integrity constraint on global temporary table
 
-Even if PostgreSQL allow it the pgtt extension try to mimic as much as possible
-the same behavior of Oracle and other RDBMS like DB2, SQL Server or MySQL.
+Even if PostgreSQL allow foreign keys on temporary table, the pgtt extension try
+to mimic as much as possible the same behavior of Oracle and other RDBMS like DB2,
+SQL Server or MySQL.
 
 	ORA-14455: attempt to create referential integrity constraint on temporary table.  
 
