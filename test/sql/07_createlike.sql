@@ -15,7 +15,7 @@ CREATE GLOBAL TEMPORARY TABLE t_glob_temptable1 (
 ) ON COMMIT PRESERVE ROWS;
 
 -- Look at table description
-\d t_glob_temptable1
+\d+ t_glob_temptable1
 
 -- Look at Global Temporary Table definition
 SELECT nspname, relname, preserved, code FROM pgtt_schema.pg_global_temp_tables;
@@ -29,7 +29,7 @@ BEGIN;
 INSERT INTO t_glob_temptable1 VALUES (1, 'One');
 
 -- Look at temp table description
-\d t_glob_temptable1
+\d+ t_glob_temptable1
 
 -- Look if we have two tables now
 SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
