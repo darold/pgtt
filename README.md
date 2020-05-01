@@ -247,6 +247,19 @@ You can create indexes on the global temporary table:
 
 just like with any other tables.
 
+The use of FOREIGN KEYS in a Global Temporary Table is not allowed.
+
+	CREATE GLOBAL TEMPORARY TABLE t2 (c1 integer, FOREIGN KEY (c1) REFERENCES source (id));
+	ERROR:  attempt to create referential integrity constraint on global temporary table
+
+	ALTER TABLE t2 ADD FOREIGN KEY (c1) REFERENCES source (id);
+	ERROR:  attempt to create referential integrity constraint on global temporary table
+
+Even if PostgreSQL allow it the pgtt extension try to mimic as much as possible
+the same behavior of Oracle and other RDBMS like DB2, SQL Server or MySQL.
+
+	ORA-14455: attempt to create referential integrity constraint on temporary table.  
+
 
 ### [How the extension really works](#how-the-extension-really-works)
 
