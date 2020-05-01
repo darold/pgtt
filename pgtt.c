@@ -803,6 +803,31 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			break;
 		}
 
+		case T_AlterTableStmt:
+		{
+			/* Look for contrainst statement */
+			AlterTableStmt   *stmt = (AlterTableStmt *)parsetree;
+			ListCell   *lcmd;
+
+			if (stmt->relkind != OBJECT_TABLE)
+				break;
+
+			/* We do not allow foreign keys on global temporary table */
+			foreach(lcmd, stmt->cmds)
+			{
+				AlterTableCmd *cmd = (AlterTableCmd *) lfirst(lcmd);
+
+				if (cmd->subtype == AT_ProcessedConstraint || cmd->subtype == AT_AddConstraint)
+				{
+					Constraint *constr = (Constraint *) cmd->def;
+					if (constr->contype == CONSTR_FOREIGN)
+						ereport(ERROR,
+								(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+								 errmsg("attempt to create referential integrity constraint on global temporary table")));
+				}
+			}
+		}
+
 		default:
 			break;
 	}

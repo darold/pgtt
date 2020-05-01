@@ -1,0 +1,35 @@
+CREATE ROLE
+CREATE EXTENSION
+You are now connected to database "gtt_privilege" as user "pgtt_user1".
+LOAD
+    search_path     
+--------------------
+ public,pgtt_schema
+(1 row)
+
+CREATE TABLE
+   nspname   |      relname      | preserved |         code         
+-------------+-------------------+-----------+----------------------
+ pgtt_schema | t_glob_temptable1 | t         | id integer, lbl text
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+   nspname   |      relname      
+-------------+-------------------
+ pgtt_schema | t_glob_temptable1
+ pg_temp_4   | t_glob_temptable1
+(2 rows)
+
+SET
+ id | lbl 
+----+-----
+(0 rows)
+
+SET
+ id | lbl 
+----+-----
+  1 | One
+  2 | two
+(2 rows)
+

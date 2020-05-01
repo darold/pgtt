@@ -1,0 +1,70 @@
+CREATE SCHEMA
+CREATE EXTENSION
+LOAD
+   search_path    
+------------------
+ public,"SESSION"
+(1 row)
+
+CREATE TABLE
+SET
+CREATE INDEX
+CREATE INDEX
+ nspname |      relname      | preserved |         code         
+---------+-------------------+-----------+----------------------
+ SESSION | t_glob_temptable1 | t         | id integer, lbl text
+(1 row)
+
+    Unlogged table "SESSION.t_glob_temptable1"
+ Column |  Type   | Collation | Nullable | Default 
+--------+---------+-----------+----------+---------
+ id     | integer |           |          | 
+ lbl    | text    |           |          | 
+Indexes:
+    "t_glob_temptable1_id_idx" btree (id)
+    "t_glob_temptable1_lbl_idx" btree (lbl)
+
+SET
+INSERT 0 1
+  nspname  |      relname      
+-----------+-------------------
+ SESSION   | t_glob_temptable1
+ pg_temp_3 | t_glob_temptable1
+(2 rows)
+
+SET
+        Table "pg_temp_3.t_glob_temptable1"
+ Column |  Type   | Collation | Nullable | Default 
+--------+---------+-----------+----------+---------
+ id     | integer |           |          | 
+ lbl    | text    |           |          | 
+Indexes:
+    "t_glob_temptable1_id_idx" btree (id)
+    "t_glob_temptable1_lbl_idx" btree (lbl)
+
+SET
+INSERT 0 1
+ id | lbl 
+----+-----
+  2 | two
+(1 row)
+
+ id | lbl 
+----+-----
+  1 | One
+  2 | two
+(2 rows)
+
+CREATE SCHEMA
+SET
+ id | lbl 
+----+-----
+  2 | two
+(1 row)
+
+ id | lbl 
+----+-----
+  1 | One
+  2 | two
+(2 rows)
+

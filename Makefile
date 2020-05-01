@@ -23,7 +23,7 @@ DATA = $(wildcard updates/*--*.sql) sql/$(EXTENSION)--$(EXTVERSION).sql
 TESTS        = 00_init 01_oncommitdelete 02_oncommitpreserve \
 	       03_createontruncate 04_rename 05_useindex \
 	       06_createas 07_createlike 08_plplgsql \
-	       09_transaction
+	       09_transaction 10_foreignkey
 
 REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --inputdir=test
