@@ -279,6 +279,13 @@ SQL Server or MySQL.
 
 	ORA-14455: attempt to create referential integrity constraint on temporary table.  
 
+#### Partitioning
+
+Partitioning on Global Temporary Table is not supported, again not because
+PostgreSQL do not allow partition on temporary table but because other RDBMS
+like Oracle, DB2 and MySQL do not support it. SQL Server supports partition
+on global temporary table.
+
 
 ### [How the extension really works](#how-the-extension-really-works)
 

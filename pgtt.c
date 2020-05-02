@@ -554,6 +554,14 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 				break;
 
 			/*
+			 * We do not allow partitioning on GTT, not that PostgreSQL can
+			 * not do it but because we want to mimic the Oracle or other
+			 * RDBMS behavior.
+			 */
+			if (stmt->partspec != NULL)
+				elog(ERROR, "Global Temporary Table do not support partitioning.");
+
+			/*
 			 * What to do at commit time for global temporary relations
 			 * default is ON COMMIT PRESERVE ROWS (do nothing)
 			 */
