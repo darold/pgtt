@@ -1,2 +1,28 @@
+Version 2.1 - May 11 2020
+
+This is a maintenance release to complete the work on the extension
+and fix some issues.
+ 
+  * Prevent use of foreign keys with GTT, not that PostgreSQL do not
+    allow it but just to mimic the behavior of Oracle and other RDBMS
+    like DB2, SQL Server and MySQL for example.
+  * Raise an error on an attempt to partition a Global Temporary Table.
+    This is not supported, again not because PostgreSQL do not allow
+    partition on temporary table but because other RDBMS like Oracle,
+    DB2 and MySQL do not support it.
+  * Add support to comments, constraints and identity columns clauses
+    when creating the GTT.
+
+Other fixes:
+
+  - Add regression tests on partitioning and FK.
+  - Exclude regression.* files from git scope.
+  - Improve documentation and add information about constraints.
+  - Add documentation about unsupported FK iand partition on GTT.
+  - Fix missing files for expected test results.
+  - Fix exclusion of .out and results directory.
+  - Update regression testis about changes on CREATE TABLE ... LIKE.
+  - Fix some typo in documentation and  markdown titles.
+
 Version 2.0 - April 19 2020
 	Initial release.

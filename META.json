@@ -2,7 +2,7 @@
 	"name": "pgtt",
 	"abstract": "Extension to add Global Temporary Tables feature to PostgreSQL",
 	"description": "pgtt is a PostgreSQL extension to add Oracle-style Global Temporary Tables feature. It is based on unlogged table, partitioning and views.",
-	"version": "2.0.0",
+	"version": "2.1.0",
 	"maintainer": "Gilles Darold <gilles@darold.net>",
 	"license": {
 		"PostgreSQL": "http://www.postgresql.org/about/licence"
@@ -17,14 +17,14 @@
 	},
 	"provides": {
 		"pgtt": {
-			"file": "sql/pgtt--2.0.0.sql",
+			"file": "sql/pgtt--2.1.0.sql",
 			"docfile": "doc/pgtt.md",
-			"version": "2.0.0",
+			"version": "2.1.0",
 			"abstract": "Extension to manage Global Temporary Tables"
 		}
 	},
 	"meta-spec": {
-		"version": "2.0.0",
+		"version": "2.1.0",
 		"url": "http://pgxn.org/meta/spec.txt"
 	},
 	"tags": [
