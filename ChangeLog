@@ -18,10 +18,10 @@ Other fixes:
   - Add regression tests on partitioning and FK.
   - Exclude regression.* files from git scope.
   - Improve documentation and add information about constraints.
-  - Add documentation about unsupported FK iand partition on GTT.
+  - Add documentation about unsupported FK and partition on GTT.
   - Fix missing files for expected test results.
   - Fix exclusion of .out and results directory.
-  - Update regression testis about changes on CREATE TABLE ... LIKE.
+  - Update regression tests about changes on CREATE TABLE ... LIKE.
   - Fix some typo in documentation and  markdown titles.
 
 Version 2.0 - April 19 2020
