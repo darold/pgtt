@@ -1,3 +1,9 @@
+Version 2.2 - Nov 06 2020
+
+This release is a port of the extension for PostgreSQL v12 and v13.
+Works on all PostgreSQL version from v9.5 to current.
+
+
 Version 2.1 - May 11 2020
 
 This is a maintenance release to complete the work on the extension
