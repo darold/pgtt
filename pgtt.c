@@ -81,6 +81,13 @@
 PG_MODULE_MAGIC;
 
 /* Define ProcessUtility hook proto/parameters following the PostgreSQL version */
+#if PG_VERSION_NUM >= 130000
+#define GTT_PROCESSUTILITY_PROTO PlannedStmt *pstmt, const char *queryString, \
+					ProcessUtilityContext context, ParamListInfo params, \
+					QueryEnvironment *queryEnv, DestReceiver *dest, \
+					QueryCompletion *qc
+#define GTT_PROCESSUTILITY_ARGS pstmt, queryString, context, params, queryEnv, dest, qc
+#else
 #if PG_VERSION_NUM >= 100000
 #define GTT_PROCESSUTILITY_PROTO PlannedStmt *pstmt, const char *queryString, \
 					ProcessUtilityContext context, ParamListInfo params, \
@@ -98,7 +105,7 @@ PG_MODULE_MAGIC;
 					DestReceiver *dest, char *completionTag
 #define GTT_PROCESSUTILITY_ARGS parsetree, queryString, params, isTopLevel, dest, completionTag
 #endif
-
+#endif
 
 /* Saved hook values in case of unload */
 static ProcessUtility_hook_type prev_ProcessUtility = NULL;
@@ -553,6 +560,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			if (regexec(&create_global_regexv, queryString, 0, 0, 0) != 0)
 				break;
 
+#if (PG_VERSION_NUM >= 100000)
 			/*
 			 * We do not allow partitioning on GTT, not that PostgreSQL can
 			 * not do it but because we want to mimic the Oracle or other
@@ -560,6 +568,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			 */
 			if (stmt->partspec != NULL)
 				elog(ERROR, "Global Temporary Table do not support partitioning.");
+#endif
 
 			/*
 			 * What to do at commit time for global temporary relations
@@ -743,6 +752,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			gtt.relid = 0;
 			/* Look if the table is declared as GTT */
 			GttHashTableLookup(stmt->relation->relname, gtt);
+			//relation_close(relation, NoLock);
 
 			/* Not registered as a GTT, nothing to do here */
 			if (gtt.relid == 0)
@@ -771,9 +781,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 		{
 			/* COMMENT ON TABLE/COLUMN statement */
 			CommentStmt   *stmt = (CommentStmt *)parsetree;
-			List          *object = castNode(List, stmt->object);
 			Gtt           gtt;
-			List          *relname;
 			Relation      relation;
 			char          *nspname;
 
@@ -781,17 +789,21 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			if (stmt->objtype != OBJECT_TABLE && stmt->objtype != OBJECT_COLUMN)
 				break;
 
-			if (stmt->objtype == OBJECT_COLUMN)
-				relname = list_truncate(list_copy(object), list_length(object) - 1);
-			else
-				relname = list_truncate(list_copy(object), list_length(object));
+			/*
+			 * Translate the parser representation that identifies this object into an
+			 * ObjectAddress.  get_object_address() will throw an error if the object
+			 * does not exist, and will also acquire a lock on the target to guard
+			 * against concurrent DROP operations.
+			 */
+#if (PG_VERSION_NUM < 100000)
+			(void) get_object_address(stmt->objtype, stmt->objname, stmt->objargs,
+										 &relation, ShareUpdateExclusiveLock, false);
+#else
+			(void) get_object_address(stmt->objtype, stmt->object,
+										&relation, ShareUpdateExclusiveLock, false);
+#endif
 
-			if (!relname)
-				break;
-
-			relation = relation_openrv(makeRangeVarFromNameList(relname), NoLock);
 			nspname = get_namespace_name(RelationGetNamespace(relation));
-
 			if (strcmp(nspname, pgtt_namespace_name) != 0)
 			{
 				if (strstr(nspname, "pg_temp") != NULL)
@@ -799,8 +811,8 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 				break;
 			}
 
-			gtt.relid = 0;
 			/* Look if the table is declared as GTT */
+			gtt.relid = 0;
 			GttHashTableLookup(RelationGetRelationName(relation), gtt);
 			relation_close(relation, NoLock);
 
@@ -825,7 +837,11 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			{
 				AlterTableCmd *cmd = (AlterTableCmd *) lfirst(lcmd);
 
-				if (cmd->subtype == AT_ProcessedConstraint || cmd->subtype == AT_AddConstraint)
+				if (cmd->subtype == AT_AddConstraint
+#if (PG_VERSION_NUM < 130000)
+						|| cmd->subtype == AT_ProcessedConstraint
+#endif
+				   )
 				{
 					Constraint *constr = (Constraint *) cmd->def;
 					if (constr->contype == CONSTR_FOREIGN)
@@ -892,9 +908,17 @@ gtt_table_exists(PlannedStmt *pstmt)
 	{
 		Assert(rte->relkind == RELKIND_RELATION);
 
+#if (PG_VERSION_NUM >= 120000)
+		rel = table_open(rte->relid, NoLock);
+#else
 		rel = heap_open(rte->relid, NoLock);
+#endif
 		name = RelationGetRelationName(rel);
+#if (PG_VERSION_NUM >= 120000)
+		table_close(rel, NoLock);
+#else
 		heap_close(rel, NoLock);
+#endif
 
 		gtt.relid = 0;
 		gtt.temp_relid = 0;
@@ -1254,7 +1278,7 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
         /* Elements of the "CREATE TABLE" query tree */
         RangeVar                   *parent_rv;
         RangeVar                   *table_rv;
-        TableLikeClause             like_clause;
+        TableLikeClause            *like_clause = makeNode(TableLikeClause);
         CreateStmt                 *createStmt = makeNode(CreateStmt);
         List                       *createStmts;
         ListCell                   *lc;
@@ -1282,25 +1306,27 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 	/* Set name of temporary table same as parent table */
 	table_rv = makeRangeVar("pg_temp", parent_rv->relname, -1);
         Assert(table_rv);
-	//RangeVarAdjustRelationPersistence(table_rv, InvalidOid);
 
 	elog(DEBUG1, "Initialize TableLikeClause structure");
         /* Initialize TableLikeClause structure */
-        NodeSetTag(&like_clause, T_TableLikeClause);
-        like_clause.relation            = copyObject(parent_rv);
-        like_clause.options             = CREATE_TABLE_LIKE_DEFAULTS
+        like_clause->relation            = copyObject(parent_rv);
+        like_clause->options             = CREATE_TABLE_LIKE_DEFAULTS
 						| CREATE_TABLE_LIKE_INDEXES
 						| CREATE_TABLE_LIKE_CONSTRAINTS
+#if (PG_VERSION_NUM >= 100000)
 						| CREATE_TABLE_LIKE_IDENTITY
+#endif
+#if (PG_VERSION_NUM >= 120000)
 						| CREATE_TABLE_LIKE_GENERATED
+#endif
 						| CREATE_TABLE_LIKE_COMMENTS;
 
 	elog(DEBUG1, "Initialize CreateStmt structure");
         /* Initialize CreateStmt structure */
-        createStmt->relation            = table_rv;
+        createStmt->relation            = copyObject(table_rv);
 	createStmt->relation->schemaname = NULL;
 	createStmt->relation->relpersistence = RELPERSISTENCE_TEMP;
-        createStmt->tableElts           = list_make1(copyObject(&like_clause));
+        createStmt->tableElts           = list_make1(copyObject(like_clause));
         createStmt->inhRelations        = NIL;
         createStmt->ofTypename          = NULL;
         createStmt->constraints         = NIL;
@@ -1323,12 +1349,10 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
         /* Create the temporary table */
         foreach (lc, createStmts)
         {
-                Node *cur_stmt;
-
-		elog(DEBUG1, "Processing statement of type %d", T_CreateStmt);
                 /* Fetch current CreateStmt */
-                cur_stmt = (Node *) lfirst(lc);
+                Node *cur_stmt = (Node *) lfirst(lc);
 
+		elog(DEBUG1, "Processing statement of type %d", nodeTag(cur_stmt));
                 if (IsA(cur_stmt, CreateStmt))
                 {
 			Datum           toast_options;
@@ -1347,7 +1371,7 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 #elif (PG_VERSION_NUM < 130000)
 			temp_relid = DefineRelation((CreateStmt *) cur_stmt, RELKIND_RELATION, temp_relowner, NULL, NULL).objectId;
 #else
-			address = DefineRelation((CreateStmt *) cur_stmt, RELKIND_RELATION, temp_relowner, NULL, NULL).objectId;
+			address = DefineRelation((CreateStmt *) cur_stmt, RELKIND_RELATION, temp_relowner, NULL, NULL);
 			temp_relid = address.objectId;
 #endif
 			/* Update config one more time */
@@ -1402,14 +1426,55 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 		{
 			CommentObject((CommentStmt *) cur_stmt);
 		}
+#if (PG_VERSION_NUM > 120000)
+		else if (IsA(cur_stmt, TableLikeClause))
+		{
+			TableLikeClause *like = (TableLikeClause *) cur_stmt;
+			RangeVar   *rv = createStmt->relation;
+			List       *morestmts;
+
+			morestmts = expandTableLikeClause(rv, like);
+			createStmts = list_concat(createStmts, morestmts);
+			/* don't need a CCI now */
+			continue;
+		}
+#endif
 		else
 		{
-
-			elog(ERROR, "Statement not supported, kind %d", nodeTag(cur_stmt));
+			/*
+			 * Recurse for anything else.  Note the recursive
+			 * call will stash the objects so created into our
+			 * event trigger context.
+			 */
+#if PG_VERSION_NUM >= 100000
+                        PlannedStmt *stmt = makeNode(PlannedStmt);
+                        stmt->commandType       = CMD_UTILITY;
+                        stmt->canSetTag         = true;
+                        stmt->utilityStmt       = cur_stmt;
+                        stmt->stmt_location     = -1;
+                        stmt->stmt_len          = 0;
+			ProcessUtility(stmt,
+								 "PGTT provide a query string",
+								 PROCESS_UTILITY_SUBCOMMAND,
+								 NULL, NULL,
+								 None_Receiver,
+								 NULL);
+#elif PG_VERSION_NUM >= 90500
+			ProcessUtility(cur_stmt,
+								 "PGTT provide a query string",
+								 PROCESS_UTILITY_SUBCOMMAND,
+								 NULL,
+								 None_Receiver,
+								 NULL);
+#endif
 		}
 
 		/* Need CCI between commands */
+#if (PG_VERSION_NUM < 130000)
 		if (lnext(lc) != NULL)
+#else
+		if (lnext(createStmts, lc) != NULL)
+#endif
 			CommandCounterIncrement();
 
         }
@@ -1436,9 +1501,17 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query)
 		if (rte->relid != InvalidOid && rte->relkind == RELKIND_RELATION
 				&& !is_catalog_relid(rte->relid))
 		{
+#if (PG_VERSION_NUM >= 120000)
+			rel = table_open(rte->relid, NoLock);
+#else
 			rel = heap_open(rte->relid, NoLock);
+#endif
 			name = RelationGetRelationName(rel);
+#if (PG_VERSION_NUM >= 120000)
+			table_close(rel, NoLock);
+#else
 			heap_close(rel, NoLock);
+#endif
 
 			gtt.relid = 0;
 			gtt.temp_relid = 0;
