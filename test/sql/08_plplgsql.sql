@@ -37,7 +37,18 @@ SELECT regexp_replace(n.nspname, '\d+', 'x', 'g'), c.relname FROM pg_class c JOI
 
 -- A "template" unlogged table should exists
 SET pgtt.enabled TO off;
-\d pgtt_schema.t_glob_temptable1;
+SELECT a.attname,
+  pg_catalog.format_type(a.atttypid, a.atttypmod),
+  (SELECT substring(pg_catalog.pg_get_expr(d.adbin, d.adrelid, true) for 128)
+   FROM pg_catalog.pg_attrdef d
+   WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef),
+  a.attnotnull,
+  pg_catalog.col_description(a.attrelid, a.attnum)
+FROM pg_catalog.pg_attribute a
+WHERE a.attrelid = (
+        SELECT c.oid FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 't_glob_temptable1' AND n.nspname = 'pgtt_schema'
+        ) AND a.attnum > 0 AND NOT a.attisdropped
+ORDER BY a.attnum;
 
 -- Get rows from the template table
 SELECT * FROM pgtt_schema.t_glob_temptable1;

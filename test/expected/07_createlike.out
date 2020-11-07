@@ -15,17 +15,40 @@ WARNING:  GLOBAL is deprecated in temporary table creation
 LINE 1: CREATE GLOBAL TEMPORARY TABLE t_glob_temptable1 (
                ^
 -- Look at table description
-\d+ t_glob_temptable1
-                                                Unlogged table "pgtt_schema.t_glob_temptable1"
- Column |         Type          | Collation | Nullable |              Default               | Storage  | Stats target |      Description      
---------+-----------------------+-----------+----------+------------------------------------+----------+--------------+-----------------------
- id     | integer               |           | not null | nextval('source_id_seq'::regclass) | plain    |              | auto generated column
- c2     | character varying(50) |           | not null |                                    | extended |              | 
- lbl    | character varying     |           |          | '-'::character varying             | extended |              | 
-Indexes:
-    "t_glob_temptable1_pkey" PRIMARY KEY, btree (id)
-    "t_glob_temptable1_c2_key" UNIQUE CONSTRAINT, btree (c2)
-    "t_glob_temptable1_lbl_idx" btree (lbl)
+SELECT a.attname,
+  pg_catalog.format_type(a.atttypid, a.atttypmod),
+  (SELECT substring(pg_catalog.pg_get_expr(d.adbin, d.adrelid, true) for 128)
+   FROM pg_catalog.pg_attrdef d
+   WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef),
+  a.attnotnull,
+  pg_catalog.col_description(a.attrelid, a.attnum)
+FROM pg_catalog.pg_attribute a
+WHERE a.attrelid = (
+        SELECT c.oid FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 't_glob_temptable1' AND n.nspname = 'pgtt_schema'
+        ) AND a.attnum > 0 AND NOT a.attisdropped
+ORDER BY a.attnum;
+ attname |      format_type      |             substring              | attnotnull |    col_description    
+---------+-----------------------+------------------------------------+------------+-----------------------
+ id      | integer               | nextval('source_id_seq'::regclass) | t          | auto generated column
+ c2      | character varying(50) |                                    | t          | 
+ lbl     | character varying     | '-'::character varying             | f          | 
+(3 rows)
+
+-- With indexes defined
+SELECT c2.relname, i.indisprimary, i.indisunique, pg_catalog.pg_get_indexdef(i.indexrelid, 0, true),
+  pg_catalog.pg_get_constraintdef(con.oid, true), contype
+FROM pg_catalog.pg_class c, pg_catalog.pg_class c2, pg_catalog.pg_index i
+  LEFT JOIN pg_catalog.pg_constraint con ON (conrelid = i.indrelid AND conindid = i.indexrelid AND contype IN ('p','u','x'))
+WHERE c.oid = (
+        SELECT c.oid FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 't_glob_temptable1' AND n.nspname = 'pgtt_schema'
+        ) AND c.oid = i.indrelid AND i.indexrelid = c2.oid
+ORDER BY i.indisprimary DESC, c2.relname;
+          relname          | indisprimary | indisunique |                                  pg_get_indexdef                                   | pg_get_constraintdef | contype 
+---------------------------+--------------+-------------+------------------------------------------------------------------------------------+----------------------+---------
+ t_glob_temptable1_pkey    | t            | t           | CREATE UNIQUE INDEX t_glob_temptable1_pkey ON t_glob_temptable1 USING btree (id)   | PRIMARY KEY (id)     | p
+ t_glob_temptable1_c2_key  | f            | t           | CREATE UNIQUE INDEX t_glob_temptable1_c2_key ON t_glob_temptable1 USING btree (c2) | UNIQUE (c2)          | u
+ t_glob_temptable1_lbl_idx | f            | f           | CREATE INDEX t_glob_temptable1_lbl_idx ON t_glob_temptable1 USING btree (lbl)      |                      | 
+(3 rows)
 
 -- Look at Global Temporary Table definition
 SELECT nspname, relname, preserved, code FROM pgtt_schema.pg_global_temp_tables;
@@ -48,17 +71,39 @@ BEGIN;
 -- With the first insert some value in the temporary table
 INSERT INTO t_glob_temptable1 VALUES (1, 'One');
 -- Look at temp table description
-\d+ t_glob_temptable1
-                                                     Table "pg_temp_4.t_glob_temptable1"
- Column |         Type          | Collation | Nullable |              Default               | Storage  | Stats target |      Description      
---------+-----------------------+-----------+----------+------------------------------------+----------+--------------+-----------------------
- id     | integer               |           | not null | nextval('source_id_seq'::regclass) | plain    |              | auto generated column
- c2     | character varying(50) |           | not null |                                    | extended |              | 
- lbl    | character varying     |           |          | '-'::character varying             | extended |              | 
-Indexes:
-    "t_glob_temptable1_pkey" PRIMARY KEY, btree (id)
-    "t_glob_temptable1_c2_key" UNIQUE CONSTRAINT, btree (c2)
-    "t_glob_temptable1_lbl_idx" btree (lbl)
+SELECT a.attname,
+  pg_catalog.format_type(a.atttypid, a.atttypmod),
+  (SELECT substring(pg_catalog.pg_get_expr(d.adbin, d.adrelid, true) for 128)
+   FROM pg_catalog.pg_attrdef d
+   WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef),
+  a.attnotnull,
+  pg_catalog.col_description(a.attrelid, a.attnum)
+FROM pg_catalog.pg_attribute a
+WHERE a.attrelid = (
+        SELECT c.oid FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 't_glob_temptable1' AND n.nspname LIKE 'pg_temp_%'
+        ) AND a.attnum > 0 AND NOT a.attisdropped
+ORDER BY a.attnum;
+ attname |      format_type      |             substring              | attnotnull |    col_description    
+---------+-----------------------+------------------------------------+------------+-----------------------
+ id      | integer               | nextval('source_id_seq'::regclass) | t          | auto generated column
+ c2      | character varying(50) |                                    | t          | 
+ lbl     | character varying     | '-'::character varying             | f          | 
+(3 rows)
+
+SELECT c2.relname, i.indisprimary, i.indisunique, pg_catalog.pg_get_indexdef(i.indexrelid, 0, true),
+  pg_catalog.pg_get_constraintdef(con.oid, true), contype
+FROM pg_catalog.pg_class c, pg_catalog.pg_class c2, pg_catalog.pg_index i
+  LEFT JOIN pg_catalog.pg_constraint con ON (conrelid = i.indrelid AND conindid = i.indexrelid AND contype IN ('p','u','x'))
+WHERE c.oid = ( 
+        SELECT c.oid FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 't_glob_temptable1' AND n.nspname LIKE 'pg_temp_%'
+        ) AND c.oid = i.indrelid AND i.indexrelid = c2.oid
+ORDER BY i.indisprimary DESC, c2.relname;
+          relname          | indisprimary | indisunique |                                  pg_get_indexdef                                   | pg_get_constraintdef | contype 
+---------------------------+--------------+-------------+------------------------------------------------------------------------------------+----------------------+---------
+ t_glob_temptable1_pkey    | t            | t           | CREATE UNIQUE INDEX t_glob_temptable1_pkey ON t_glob_temptable1 USING btree (id)   | PRIMARY KEY (id)     | p
+ t_glob_temptable1_c2_key  | f            | t           | CREATE UNIQUE INDEX t_glob_temptable1_c2_key ON t_glob_temptable1 USING btree (c2) | UNIQUE (c2)          | u
+ t_glob_temptable1_lbl_idx | f            | f           | CREATE INDEX t_glob_temptable1_lbl_idx ON t_glob_temptable1 USING btree (lbl)      |                      | 
+(3 rows)
 
 -- Look if we have two tables now
 SELECT regexp_replace(n.nspname, '\d+', 'x', 'g'), c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
