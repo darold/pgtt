@@ -34,31 +34,31 @@ SET pgtt.enabled TO on;
 -- With the first insert some value in the temporary table
 INSERT INTO t_glob_temptable1 VALUES (1, 'One');
 -- Look if we have two tables now
-SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
-   nspname   |      relname      
--------------+-------------------
- pgtt_schema | t_glob_temptable1
- pg_temp_3   | t_glob_temptable1
+SELECT regexp_replace(n.nspname, '\d+', 'x', 'g'), c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
+ regexp_replace |      relname      
+----------------+-------------------
+ pgtt_schema    | t_glob_temptable1
+ pg_temp_x      | t_glob_temptable1
 (2 rows)
 
-SET pgtt.enabled TO off;
-\d t_glob_temptable1;
-        Table "pg_temp_3.t_glob_temptable1"
- Column |  Type   | Collation | Nullable | Default 
---------+---------+-----------+----------+---------
- id     | integer |           |          | 
- lbl    | text    |           |          | 
-Indexes:
-    "t_glob_temptable1_id_idx" btree (id)
-    "t_glob_temptable1_lbl_idx" btree (lbl)
+-- and that the temporary table has the indexes too
+SELECT tablename, indexname FROM pg_indexes WHERE tablename = 't_glob_temptable1' and schemaname LIKE 'pg_temp_%' ORDER BY tablename, indexname;
+     tablename     |         indexname         
+-------------------+---------------------------
+ t_glob_temptable1 | t_glob_temptable1_id_idx
+ t_glob_temptable1 | t_glob_temptable1_lbl_idx
+(2 rows)
 
-SET pgtt.enabled TO on;
 INSERT INTO t_glob_temptable1 VALUES (2, 'two');
-SELECT * FROM t_glob_temptable1 WHERE id = 2;
- id | lbl 
-----+-----
-  2 | two
-(1 row)
+-- Verify that the index is used
+EXPLAIN (COSTS OFF) SELECT * FROM t_glob_temptable1 WHERE id = 2;
+                     QUERY PLAN                      
+-----------------------------------------------------
+ Bitmap Heap Scan on t_glob_temptable1
+   Recheck Cond: (id = 2)
+   ->  Bitmap Index Scan on t_glob_temptable1_id_idx
+         Index Cond: (id = 2)
+(4 rows)
 
 -- Reconnect and drop it
 \c - -

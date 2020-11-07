@@ -16,7 +16,7 @@ SELECT nspname, relname, preserved, code FROM pgtt_schema.pg_global_temp_tables;
 
 -- A "template" unlogged table should exists as well as
 -- the temporary table as we have used WITH DATA
-SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
+SELECT regexp_replace(n.nspname, '\d+', 'x', 'g'), c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
 
 -- Look at content of the template for Global Temporary Table, must be empty
 SET pgtt.enabled TO off;

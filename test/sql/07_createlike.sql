@@ -32,7 +32,7 @@ INSERT INTO t_glob_temptable1 VALUES (1, 'One');
 \d+ t_glob_temptable1
 
 -- Look if we have two tables now
-SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
+SELECT regexp_replace(n.nspname, '\d+', 'x', 'g'), c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
 
 -- Look at content of the template for Global Temporary Table, must be empty
 SET pgtt.enabled TO off;

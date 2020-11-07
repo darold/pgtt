@@ -49,7 +49,7 @@ BEGIN;
 INSERT INTO t_glob_temptable1 VALUES (1, 'One');
 -- Look at temp table description
 \d+ t_glob_temptable1
-                                                     Table "pg_temp_3.t_glob_temptable1"
+                                                     Table "pg_temp_4.t_glob_temptable1"
  Column |         Type          | Collation | Nullable |              Default               | Storage  | Stats target |      Description      
 --------+-----------------------+-----------+----------+------------------------------------+----------+--------------+-----------------------
  id     | integer               |           | not null | nextval('source_id_seq'::regclass) | plain    |              | auto generated column
@@ -61,11 +61,11 @@ Indexes:
     "t_glob_temptable1_lbl_idx" btree (lbl)
 
 -- Look if we have two tables now
-SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
-   nspname   |      relname      
--------------+-------------------
- pgtt_schema | t_glob_temptable1
- pg_temp_3   | t_glob_temptable1
+SELECT regexp_replace(n.nspname, '\d+', 'x', 'g'), c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
+ regexp_replace |      relname      
+----------------+-------------------
+ pgtt_schema    | t_glob_temptable1
+ pg_temp_x      | t_glob_temptable1
 (2 rows)
 
 -- Look at content of the template for Global Temporary Table, must be empty

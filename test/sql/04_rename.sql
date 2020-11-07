@@ -38,7 +38,7 @@ SET pgtt.enabled TO on;
 INSERT INTO t_glob_temptable2 VALUES (1, 'One');
 
 -- Look if we have two tables now
-SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable2';
+SELECT regexp_replace(n.nspname, '\d+', 'x', 'g'), c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable2';
 
 -- The table doesn't exist anymore
 SET pgtt.enabled TO off;
@@ -58,7 +58,7 @@ LOAD 'pgtt';
 
 ALTER TABLE t_glob_temptable2 RENAME TO t_glob_temptable1;
 
--- Look if we the renaming is effective
+-- Look if the renaming is effective
 SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
 
 -- Reconnect and drop it

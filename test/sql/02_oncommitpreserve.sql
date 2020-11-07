@@ -25,7 +25,7 @@ BEGIN;
 INSERT INTO t_glob_temptable1 VALUES (1, 'One');
 
 -- Look if we have two tables now
-SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
+SELECT regexp_replace(n.nspname, '\d+', 'x', 'g'), c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
 
 -- Second insert, the temporary table exists
 INSERT INTO t_glob_temptable1 VALUES (2, 'Two');

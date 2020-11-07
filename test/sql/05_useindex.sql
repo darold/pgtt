@@ -28,15 +28,15 @@ SET pgtt.enabled TO on;
 INSERT INTO t_glob_temptable1 VALUES (1, 'One');
 
 -- Look if we have two tables now
-SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
+SELECT regexp_replace(n.nspname, '\d+', 'x', 'g'), c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
 
-SET pgtt.enabled TO off;
-\d t_glob_temptable1;
-SET pgtt.enabled TO on;
+-- and that the temporary table has the indexes too
+SELECT tablename, indexname FROM pg_indexes WHERE tablename = 't_glob_temptable1' and schemaname LIKE 'pg_temp_%' ORDER BY tablename, indexname;
 
 INSERT INTO t_glob_temptable1 VALUES (2, 'two');
 
-SELECT * FROM t_glob_temptable1 WHERE id = 2;
+-- Verify that the index is used
+EXPLAIN (COSTS OFF) SELECT * FROM t_glob_temptable1 WHERE id = 2;
 
 -- Reconnect and drop it
 \c - -
