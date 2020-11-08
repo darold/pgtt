@@ -22,7 +22,7 @@ SELECT regexp_replace(n.nspname, '\d+', 'x', 'g'), c.relname FROM pg_class c JOI
 SELECT nspname, relname, preserved, code FROM pgtt_schema.pg_global_temp_tables;
 
 -- Second insert failure
-INSERT INTO t_glob_temptable1 VALUES ('Two', 2);
+INSERT INTO t_glob_temptable1 VALUES (2, two);
 
 ROLLBACK;
 
