@@ -360,9 +360,9 @@ gtt_ProcessUtility(GTT_PROCESSUTILITY_PROTO)
 }
 
 /*
- * Look at utility command to look at CREATE TABLE / DROP TABLE
- * and INSERT INTO statements if a Global Temporary Table is
- * concerned.
+ * Look at utility command to search CREATE TABLE / DROP TABLE
+ * and INSERT INTO statements to see if a Global Temporary Table
+ * is concerned.
  * Return true if all work is done and the origin statement must
  * be forgotten. False mean that the statement must be processed
  * normally.
@@ -1531,8 +1531,18 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query)
 
 			if (gtt.relname[0] != '\0')
 			{
+				/* After an error and rollback the table is still registered in cache but must be initialized */
+				if (gtt.created && OidIsValid(gtt.temp_relid)
+						&& !SearchSysCacheExists1(RELOID, ObjectIdGetDatum(gtt.temp_relid))
+						)
+				{
+					elog(DEBUG1, "invalid temporary table with relid %d (%s), reseting.", gtt.temp_relid, gtt.relname);
+					gtt.created = false;
+					gtt.temp_relid = 0;
+				}
 				/* Create the temporary table if it does not exists */
-				if (!gtt.created) {
+				if (!gtt.created)
+				{
 					elog(DEBUG1, "global temporary table from relid %d does not exists create it: %s", rte->relid, gtt.relname);
 					/* Call create temporary table */
 					if ((gtt.temp_relid = create_temporary_table_internal(gtt.relid, gtt.preserved)) != InvalidOid)

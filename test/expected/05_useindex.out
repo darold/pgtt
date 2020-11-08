@@ -74,14 +74,13 @@ SELECT tablename, indexname FROM pg_indexes WHERE tablename = 't_glob_temptable1
 
 INSERT INTO t_glob_temptable1 VALUES (2, 'two');
 -- Verify that the index is used
+SET enable_bitmapscan TO off;
 EXPLAIN (COSTS OFF) SELECT * FROM t_glob_temptable1 WHERE id = 2;
-                     QUERY PLAN                      
------------------------------------------------------
- Bitmap Heap Scan on t_glob_temptable1
-   Recheck Cond: (id = 2)
-   ->  Bitmap Index Scan on t_glob_temptable1_id_idx
-         Index Cond: (id = 2)
-(4 rows)
+                           QUERY PLAN                           
+----------------------------------------------------------------
+ Index Scan using t_glob_temptable1_id_idx on t_glob_temptable1
+   Index Cond: (id = 2)
+(2 rows)
 
 -- Reconnect and drop it
 \c - -

@@ -61,6 +61,8 @@ SELECT * FROM t_glob_temptable1;
 \c - -
 LOAD 'pgtt';
 
+SET pgtt.enabled TO off;
+
 -- Verify that only the temporary table have been dropped
 -- Only the "template" unlogged table should exists
 SELECT regexp_replace(n.nspname, '\d+', 'x', 'g'), c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';

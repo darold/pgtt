@@ -57,6 +57,7 @@ SELECT tablename, indexname FROM pg_indexes WHERE tablename = 't_glob_temptable1
 INSERT INTO t_glob_temptable1 VALUES (2, 'two');
 
 -- Verify that the index is used
+SET enable_bitmapscan TO off;
 EXPLAIN (COSTS OFF) SELECT * FROM t_glob_temptable1 WHERE id = 2;
 
 -- Reconnect and drop it
