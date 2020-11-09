@@ -1,7 +1,18 @@
-Version 2.2 - Nov 06 2020
+Version 2.2 - Nov 08 2020
 
 This release is a port of the extension for PostgreSQL v12 and v13.
-Works on all PostgreSQL version from v9.5 to current.
+Works now on all PostgreSQL version from v9.5 to current. It also
+fixes automatic creation of the underlying temporary table after a
+rollback.
+
+Other fixes:
+
+  - Fix regression test for all supported PG version.
+  - Replace call to \d in regression tests, they do not report the
+    same information following PG version.
+  - Remove test about partitioning as it returns a failure for PG < 10.
+  - Update regression tests to avoid failure related to temp table id.
+  - Add regression test for error on rollback issue.
 
 
 Version 2.1 - May 11 2020
@@ -29,6 +40,7 @@ Other fixes:
   - Fix exclusion of .out and results directory.
   - Update regression tests about changes on CREATE TABLE ... LIKE.
   - Fix some typo in documentation and  markdown titles.
+
 
 Version 2.0 - April 19 2020
 	Initial release.
