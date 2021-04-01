@@ -1,3 +1,14 @@
+Version 2.3 - Apr 02 2021
+
+This version fix the compatibility with PostgreSQL 10 and 11.
+
+When use on PostgreSQL 10 and 11 the following was raised
+  ERROR: unrecognized node type: 375
+Thanks to smallcookie086 for the report.
+
+Add upgrade/downgrade SQL files.
+
+
 Version 2.2 - Nov 08 2020
 
 This release is a port of the extension for PostgreSQL v12 and v13.
