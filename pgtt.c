@@ -1426,7 +1426,7 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 		{
 			CommentObject((CommentStmt *) cur_stmt);
 		}
-#if (PG_VERSION_NUM > 120000)
+#if (PG_VERSION_NUM >= 100000)
 		else if (IsA(cur_stmt, TableLikeClause))
 		{
 			TableLikeClause *like = (TableLikeClause *) cur_stmt;
