@@ -121,6 +121,7 @@ bool pgtt_is_enabled = true;
 
 /* Regular expression search */
 static regex_t create_global_regexv;
+static regex_t create_with_fk_regexv;
 
 /* Oid and name of pgtt extrension schema in the database */
 Oid pgtt_namespace_oid = InvalidOid;
@@ -253,6 +254,11 @@ _PG_init(void)
 					REG_NOSUB|REG_EXTENDED|REG_NEWLINE|REG_ICASE) != 0)
 		ereport(ERROR, (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 			errmsg("PGTT: invalid statement regexp pattern %s", "^\\s*CREATE\\s+(\\/\\*\\s*)?GLOBAL(\\s*\\*\\/)?\\s+")));
+	/* Compute regexp to detect FOREIGN KEY clause in create statement */
+	if (regcomp(&create_with_fk_regexv, "\\s*FOREIGN\\s+KEY",
+					REG_NOSUB|REG_EXTENDED|REG_NEWLINE|REG_ICASE) != 0)
+		ereport(ERROR, (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+			errmsg("PGTT: invalid statement regexp pattern %s", "\\s*FOREIGN\\s+KEY")));
 
 	if (GttHashTable == NULL)
 	{
@@ -311,6 +317,7 @@ exitHook(int code, Datum arg)
 
 	/* Freeing precompiled regex */
 	regfree(&create_global_regexv);
+	regfree(&create_with_fk_regexv);
 }
 
 static void
@@ -560,6 +567,11 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			if (regexec(&create_global_regexv, queryString, 0, 0, 0) != 0)
 				break;
 
+			/* Check if there is foreign key defined in the statement */
+			if (regexec(&create_with_fk_regexv, queryString, 0, 0, 0) == 0)
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+						 errmsg("attempt to create referential integrity constraint on global temporary table")));
 #if (PG_VERSION_NUM >= 100000)
 			/*
 			 * We do not allow partitioning on GTT, not that PostgreSQL can
@@ -643,6 +655,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			GttHashTableInsert(gtt, gtt.relname);
 			work_completed = true;
 
+			elog(DEBUG1, "Global Temporary Table \"%s\" created", gtt.relname);
 			break;
 		}
 
@@ -761,7 +774,6 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			gtt.relid = 0;
 			/* Look if the table is declared as GTT */
 			GttHashTableLookup(stmt->relation->relname, gtt);
-			//relation_close(relation, NoLock);
 
 			/* Not registered as a GTT, nothing to do here */
 			if (gtt.relid == 0)
@@ -837,8 +849,17 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			/* Look for contrainst statement */
 			AlterTableStmt   *stmt = (AlterTableStmt *)parsetree;
 			ListCell   *lcmd;
+			Gtt        gtt;
 
 			if (stmt->relkind != OBJECT_TABLE)
+				break;
+
+			/* Look if the table is declared as GTT */
+			gtt.relid = 0;
+			GttHashTableLookup(stmt->relation->relname, gtt);
+
+			/* Not registered as a GTT, nothing to do here */
+			if (gtt.relid == 0)
 				break;
 
 			/* We do not allow foreign keys on global temporary table */
