@@ -75,8 +75,7 @@
 
 #define CATALOG_GLOBAL_TEMP_REL	"pg_global_temp_tables"
 #define Anum_pgtt_relid   1
-#define Anum_pgtt_viewid  2
-#define Anum_pgtt_datcrea 3
+#define Anum_pgtt_relname 3
 
 PG_MODULE_MAGIC;
 
@@ -202,6 +201,7 @@ static bool is_catalog_relid(Oid relid);
 static void force_pgtt_namespace (void);
 static void gtt_update_registered_table(Gtt gtt);
 int strremovestr(char *src, char *toremove);
+static void gtt_unregister_gtt_not_cached(const char *relname);
 
 /*
  * Module load callback
@@ -712,9 +712,8 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 					gtt.code = NULL;
 					gtt.created = false;
 
+					elog(DEBUG1, "looking if table %s is a cached GTT", relationNameValue->val.str);
 					GttHashTableLookup(relationNameValue->val.str, gtt);
-
-					elog(DEBUG1, "looking if table %s is a GTT", gtt.relname);
 					if (gtt.relname[0] != '\0')
 					{
 						/*
@@ -733,6 +732,16 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 
 						/* Remove the table from the hash table */
 						GttHashTableDelete(gtt.relname);
+					}
+					else
+					{
+						/*
+						 * Table is not on current session cache but remove
+						 * it from PGTT list if it exists.
+						 */
+						elog(DEBUG1, "looking if table %s is registered as GTT",
+												relationNameValue->val.str);
+						gtt_unregister_gtt_not_cached(relationNameValue->val.str);
 					}
 				}
 			}
@@ -1084,7 +1093,8 @@ gtt_create_table_statement(Gtt gtt)
 }
 
 /*
- * Unregister a Global Temporary Table in pg_global_temp_tables table.
+ * Unregister a Global Temporary Table in pg_global_temp_tables table
+ * using his relid.
  */
 static void
 gtt_unregister_global_temporary_table(Oid relid, const char *relname)
@@ -1095,7 +1105,7 @@ gtt_unregister_global_temporary_table(Oid relid, const char *relname)
 	SysScanDesc   scan;
 	HeapTuple     tuple;
 
-	elog(DEBUG1, "removing tuple with relname = %s", relname);
+	elog(DEBUG1, "Looking for registered GTT relid = %d, relname = %s", relid, relname);
 
 	/* Set and open the GTT relation */
 	rv = makeRangeVar(pgtt_namespace_name, CATALOG_GLOBAL_TEMP_REL, -1);
@@ -1111,7 +1121,10 @@ gtt_unregister_global_temporary_table(Oid relid, const char *relname)
 	scan = systable_beginscan(rel, 0, true, NULL, 1, key);
 	/* Remove the tuples. */
 	while (HeapTupleIsValid(tuple = systable_getnext(scan)))
-				simple_heap_delete(rel, &tuple->t_self);
+	{
+		elog(DEBUG1, "removing tuple with relid = %d and relname = %s", relid, relname);
+		simple_heap_delete(rel, &tuple->t_self);
+	}
 	/* Cleanup. */
 	systable_endscan(scan);
 #if (PG_VERSION_NUM >= 120000)
@@ -1119,7 +1132,49 @@ gtt_unregister_global_temporary_table(Oid relid, const char *relname)
 #else
 	heap_close(rel, RowExclusiveLock);
 #endif
-	GttHashTableDelete(relname);
+}
+
+/*
+ * Unregister a Global Temporary Table in pg_global_temp_tables table
+ * that is not cached and using his name only.
+ */
+static void
+gtt_unregister_gtt_not_cached(const char *relname)
+{
+	RangeVar     *rv;
+	Relation      rel;
+	ScanKeyData   key[1];
+	SysScanDesc   scan;
+	HeapTuple     tuple;
+
+	elog(DEBUG1, "Looking for registered GTT relname = %s", relname);
+
+	/* Set and open the GTT relation */
+	rv = makeRangeVar(pgtt_namespace_name, CATALOG_GLOBAL_TEMP_REL, -1);
+#if (PG_VERSION_NUM >= 120000)
+	rel = table_openrv(rv, RowExclusiveLock);
+#else
+	rel = heap_openrv(rv, RowExclusiveLock);
+#endif
+	/* Define scanning */
+	ScanKeyInit(&key[0], Anum_pgtt_relname, BTEqualStrategyNumber, F_NAMEEQ, CStringGetDatum(relname));
+
+	/* Start search of relation */
+	scan = systable_beginscan(rel, 0, true, NULL, 1, key);
+	/* Remove the tuples. */
+	while (HeapTupleIsValid(tuple = systable_getnext(scan)))
+	{
+		elog(DEBUG1, "removing tuple with relname = %s", relname);
+		simple_heap_delete(rel, &tuple->t_self);
+	}
+
+	/* Cleanup. */
+	systable_endscan(scan);
+#if (PG_VERSION_NUM >= 120000)
+	table_close(rel, RowExclusiveLock);
+#else
+	heap_close(rel, RowExclusiveLock);
+#endif
 }
 
 /*
