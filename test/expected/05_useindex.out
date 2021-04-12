@@ -87,3 +87,26 @@ EXPLAIN (COSTS OFF) SELECT * FROM t_glob_temptable1 WHERE id = 2;
 LOAD 'pgtt';
 -- Cleanup
 DROP TABLE t_glob_temptable1;
+-- Create a GTT like table
+CREATE /*GLOBAL*/ TEMPORARY TABLE t_glob_temptable2 (id integer, lbl text) ON COMMIT PRESERVE ROWS;
+CREATE INDEX ON t_glob_temptable2 (id);
+SELECT * FROM t_glob_temptable2;
+ id | lbl 
+----+-----
+(0 rows)
+
+-- Must complain that the GTT is in use
+CREATE INDEX ON t_glob_temptable2 (lbl);
+ERROR:  a temporary table has been created and is active, can not add an index on the GTT table in this session.
+\d pgtt_schema.t_glob_temptable2
+  Unlogged table "pgtt_schema.t_glob_temptable2"
+ Column |  Type   | Collation | Nullable | Default 
+--------+---------+-----------+----------+---------
+ id     | integer |           |          | 
+ lbl    | text    |           |          | 
+Indexes:
+    "t_glob_temptable2_id_idx" btree (id)
+
+\c - -
+LOAD 'pgtt';
+DROP TABLE t_glob_temptable2;

@@ -802,19 +802,18 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 		{
 			/* COMMENT ON TABLE/COLUMN statement */
 			CommentStmt   *stmt = (CommentStmt *)parsetree;
-			Gtt           gtt;
 			Relation      relation;
 			char          *nspname;
 
-			/* We only take care of tabe renaming to update our internal storage */
+			/* We only take care of comment on table or column to update our internal storage */
 			if (stmt->objtype != OBJECT_TABLE && stmt->objtype != OBJECT_COLUMN)
 				break;
 
 			/*
-			 * Translate the parser representation that identifies this object into an
-			 * ObjectAddress.  get_object_address() will throw an error if the object
-			 * does not exist, and will also acquire a lock on the target to guard
-			 * against concurrent DROP operations.
+			 * Get the relation object by calling get_object_address().
+			 * get_object_address() will throw an error if the object
+			 * does not exist, and will also acquire a lock on the target
+			 * to guard against concurrent DROP operations.
 			 */
 #if (PG_VERSION_NUM < 100000)
 			(void) get_object_address(stmt->objtype, stmt->objname, stmt->objargs,
@@ -824,22 +823,14 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 										&relation, ShareUpdateExclusiveLock, false);
 #endif
 
+			/* Just take care that the GTT is not in use */
 			nspname = get_namespace_name(RelationGetNamespace(relation));
+			relation_close(relation, NoLock);
 			if (strcmp(nspname, pgtt_namespace_name) != 0)
 			{
 				if (strstr(nspname, "pg_temp") != NULL)
 					elog(ERROR, "a temporary table has been created and is active, can not add a comment on the GTT table in this session.");
-				break;
 			}
-
-			/* Look if the table is declared as GTT */
-			gtt.relid = 0;
-			GttHashTableLookup(RelationGetRelationName(relation), gtt);
-			relation_close(relation, NoLock);
-
-			/* Not registered as a GTT, nothing to do here */
-			if (gtt.relid == 0)
-				break;
 
 			break;
 		}
@@ -880,7 +871,31 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 								 errmsg("attempt to create referential integrity constraint on global temporary table")));
 				}
 			}
+
+			break;
 		}
+
+		case T_IndexStmt:
+		{
+			/* CREATE INDEX statement */
+			IndexStmt  *stmt = (IndexStmt *) parsetree;
+			Oid        relid;
+			char       *nspname;
+
+			relid = RangeVarGetRelidExtended(stmt->relation, ShareLock, 0,
+									RangeVarCallbackOwnsRelation, NULL);
+
+			/* Just take care that the GTT is not in use */
+			nspname = get_namespace_name(get_rel_namespace(relid));
+			if (strcmp(nspname, pgtt_namespace_name) != 0)
+			{
+				if (strstr(nspname, "pg_temp") != NULL)
+					elog(ERROR, "a temporary table has been created and is active, can not add an index on the GTT table in this session.");
+			}
+
+			break;
+		}
+
 
 		default:
 			break;

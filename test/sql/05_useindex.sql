@@ -67,3 +67,17 @@ LOAD 'pgtt';
 -- Cleanup
 DROP TABLE t_glob_temptable1;
 
+-- Create a GTT like table
+CREATE /*GLOBAL*/ TEMPORARY TABLE t_glob_temptable2 (id integer, lbl text) ON COMMIT PRESERVE ROWS;
+
+CREATE INDEX ON t_glob_temptable2 (id);
+SELECT * FROM t_glob_temptable2;
+-- Must complain that the GTT is in use
+CREATE INDEX ON t_glob_temptable2 (lbl);
+
+\d pgtt_schema.t_glob_temptable2
+
+\c - -
+LOAD 'pgtt';
+
+DROP TABLE t_glob_temptable2;
