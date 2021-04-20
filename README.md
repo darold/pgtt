@@ -119,6 +119,10 @@ add the library to the $libdir/plugins/ directory.
 	sudo mkdir $libdir/plugins/
 	cd $libdir/plugins/
 	sudo ln -s ../pgtt.so
+
+Then it will be possible to use it using `LOAD '$libdir/plugins/pgtt.so';`
+To create and manage GTT using a non-superuser role you will have to grant
+privilege in on the `pgtt_schema` schema to the user.
 	
 To run test execute the following command as superuser:
 

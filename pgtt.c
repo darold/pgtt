@@ -1048,9 +1048,6 @@ strpos(char *hay, char *needle, int offset)
 static Oid
 gtt_create_table_statement(Gtt gtt)
 {
-	bool    need_priv_escalation = !superuser(); /* we might be a SU */
-	Oid     save_userid;
-	int     save_sec_context;
 	char    *newQueryString = NULL;
 	int     connected = 0;
 	int     finished = 0;
@@ -1060,17 +1057,6 @@ gtt_create_table_statement(Gtt gtt)
 	bool    isnull;
 
 	elog(DEBUG1, "proceeding to Global Temporary Table creation.");
-
-	/* The Global Temporary Table objects must be created as SU */
-	if (need_priv_escalation)
-	{
-		/* Get current user's Oid and security context */
-		GetUserIdAndSecContext(&save_userid, &save_sec_context);
-		/* Become superuser */
-		SetUserIdAndSecContext(BOOTSTRAP_SUPERUSERID, save_sec_context
-							| SECURITY_LOCAL_USERID_CHANGE
-							| SECURITY_RESTRICTED_OPERATION);
-	}
 
 	connected = SPI_connect();
 	if (connected != SPI_OK_CONNECT)
@@ -1132,10 +1118,6 @@ gtt_create_table_statement(Gtt gtt)
 	finished = SPI_finish();
 	if (finished != SPI_OK_FINISH)
 		ereport(ERROR, (errmsg("could not disconnect from SPI manager")));
-
-	/* Restore user's privileges */
-	if (need_priv_escalation)
-		SetUserIdAndSecContext(save_userid, save_sec_context);
 
 	return gttOid;
 }
@@ -1757,26 +1739,12 @@ force_pgtt_namespace (void)
 static void
 gtt_update_registered_table(Gtt gtt)
 {
-	bool    need_priv_escalation = !superuser(); /* we might be a SU */
-	Oid     save_userid;
-	int     save_sec_context;
 	char    *newQueryString = NULL;
 	int     connected = 0;
 	int     finished = 0;
 	int     result = 0;
 
 	elog(DEBUG1, "proceeding to Global Temporary Table creation.");
-
-	/* The Global Temporary Table objects must be created as SU */
-	if (need_priv_escalation)
-	{
-		/* Get current user's Oid and security context */
-		GetUserIdAndSecContext(&save_userid, &save_sec_context);
-		/* Become superuser */
-		SetUserIdAndSecContext(BOOTSTRAP_SUPERUSERID, save_sec_context
-							| SECURITY_LOCAL_USERID_CHANGE
-							| SECURITY_RESTRICTED_OPERATION);
-	}
 
 	connected = SPI_connect();
 	if (connected != SPI_OK_CONNECT)
@@ -1794,10 +1762,6 @@ gtt_update_registered_table(Gtt gtt)
 	finished = SPI_finish();
 	if (finished != SPI_OK_FINISH)
 		ereport(ERROR, (errmsg("could not disconnect from SPI manager")));
-
-	/* Restore user's privileges */
-	if (need_priv_escalation)
-		SetUserIdAndSecContext(save_userid, save_sec_context);
 }
 
 static Oid
@@ -1854,9 +1818,6 @@ get_extension_schema(Oid ext_oid)
 static void
 gtt_create_table_as(Gtt gtt, bool skipdata)
 {
-	bool    need_priv_escalation = !superuser(); /* we might be a SU */
-	Oid     save_userid;
-	int     save_sec_context;
 	char    *newQueryString = NULL;
 	int     connected = 0;
 	int     finished = 0;
@@ -1866,17 +1827,6 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 	bool    isnull;
 
 	elog(DEBUG1, "proceeding to Global Temporary Table creation.");
-
-	/* The Global Temporary Table objects must be created as SU */
-	if (need_priv_escalation)
-	{
-		/* Get current user's Oid and security context */
-		GetUserIdAndSecContext(&save_userid, &save_sec_context);
-		/* Become superuser */
-		SetUserIdAndSecContext(BOOTSTRAP_SUPERUSERID, save_sec_context
-							| SECURITY_LOCAL_USERID_CHANGE
-							| SECURITY_RESTRICTED_OPERATION);
-	}
 
 	connected = SPI_connect();
 	if (connected != SPI_OK_CONNECT)
@@ -1964,10 +1914,6 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 	finished = SPI_finish();
 	if (finished != SPI_OK_FINISH)
 		ereport(ERROR, (errmsg("could not disconnect from SPI manager")));
-
-	/* Restore user's privileges */
-	if (need_priv_escalation)
-		SetUserIdAndSecContext(save_userid, save_sec_context);
 
 	/* registrer the table in the cache */
 	GttHashTableDelete(gtt.relname);
