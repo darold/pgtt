@@ -196,7 +196,7 @@ Gtt GetGttByName(const char *name);
 static void gtt_load_global_temporary_tables(void);
 static Oid create_temporary_table_internal(Oid parent_relid, bool preserved);
 static bool gtt_check_command(GTT_PROCESSUTILITY_PROTO);
-static bool gtt_table_exists(PlannedStmt *pstmt);
+static bool gtt_table_exists(QueryDesc *queryDesc);
 void exitHook(int code, Datum arg);
 static bool is_catalog_relid(Oid relid);
 static void force_pgtt_namespace (void);
@@ -332,7 +332,8 @@ gtt_ProcessUtility(GTT_PROCESSUTILITY_PROTO)
 		 * Be sure that extension schema is at end of the search path so that
 		 * "template" tables will be find.
 		 */
-		force_pgtt_namespace();
+		if (IsTransactionState())
+			force_pgtt_namespace();
 
 		/*
 		 * Check if we have a CREATE GLOBAL TEMPORARY TABLE
@@ -384,8 +385,8 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 	Node    *parsetree = pstmt->utilityStmt;
 #endif
 
-	Assert(query != NULL);
 	Assert(parsetree != NULL);
+	Assert(queryString != NULL);
 
 	elog(DEBUG1, "gtt_check_command() on query: \"%s\"", queryString);
 
@@ -918,9 +919,8 @@ gtt_ExecutorStart(QueryDesc *queryDesc, int eflags)
 				|| queryDesc->operation == CMD_UPDATE
 				|| queryDesc->operation == CMD_SELECT)
 		{
-			PlannedStmt *pstmt = (PlannedStmt *) queryDesc->plannedstmt;
-
-			if (pstmt && gtt_table_exists(pstmt))
+			/* Verify if a GTT table is defined, create it if this is not already the case */
+			if (gtt_table_exists(queryDesc))
 				elog(DEBUG1, "ExecutorStart() statement use a Global Temporary Table");
 		}
 	}
@@ -935,13 +935,17 @@ gtt_ExecutorStart(QueryDesc *queryDesc, int eflags)
 }
 
 static bool
-gtt_table_exists(PlannedStmt *pstmt)
+gtt_table_exists(QueryDesc *queryDesc)
 {
 	bool    is_gtt = false;
 	char    *name = NULL;
 	RangeTblEntry *rte;
 	Relation      rel;
 	Gtt           gtt;
+	PlannedStmt *pstmt = (PlannedStmt *) queryDesc->plannedstmt;
+
+	if (!pstmt)
+		return false;
 
 	/* no relation in rtable probably a function call */
 	if (list_length(pstmt->rtable) == 0)
@@ -981,11 +985,13 @@ gtt_table_exists(PlannedStmt *pstmt)
 		{
 			elog(DEBUG1, "GTT found in cache with name: %s, relid: %d, temp_relid %d", gtt.relname, gtt.relid, gtt.temp_relid);
 			/* Create the temporary table if it does not exists */
-			if (!gtt.created) {
+			if (!gtt.created)
+			{
 				elog(DEBUG1, "global temporary table does not exists create it: %s", gtt.relname);
 				/* Call create temporary table */
 				if ((gtt.temp_relid = create_temporary_table_internal(gtt.relid, gtt.preserved)) != InvalidOid)
 				{
+					elog(DEBUG1, "global temporary table %s (oid: %d) created", gtt.relname, gtt.temp_relid);
 					/* Update hash list with table flagged as created */
 					gtt.created = true;
 					GttHashTableDelete(gtt.relname);
@@ -995,6 +1001,12 @@ gtt_table_exists(PlannedStmt *pstmt)
 					elog(ERROR, "can not create global temporary table %s", gtt.relname);
 			}
 			is_gtt = true;
+			if (queryDesc->operation == CMD_INSERT
+					|| queryDesc->operation == CMD_DELETE
+					|| queryDesc->operation == CMD_UPDATE)
+				LockRelationOid(gtt.temp_relid, RowExclusiveLock);
+			else
+				LockRelationOid(gtt.temp_relid, AccessShareLock);
 		}
 		else
 			/* the table is not a global temporary table do nothing*/
@@ -1567,7 +1579,6 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 		if (lnext(createStmts, lc) != NULL)
 #endif
 			CommandCounterIncrement();
-
         }
 
 	elog(DEBUG1, "Create a temporary table done with Oid: %d", temp_relid);
@@ -1638,6 +1649,7 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query)
 					/* Call create temporary table */
 					if ((gtt.temp_relid = create_temporary_table_internal(gtt.relid, gtt.preserved)) != InvalidOid)
 					{
+						elog(DEBUG1, "global temporary table %s (oid: %d) created", gtt.relname, gtt.temp_relid);
 						/* Update hash list with table flagged as created*/
 						gtt.created = true;
 						GttHashTableDelete(gtt.relname);
