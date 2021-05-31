@@ -79,6 +79,12 @@
 
 PG_MODULE_MAGIC;
 
+#if PG_VERSION_NUM >= 140000
+#define STMT_OBJTYPE(stmt) stmt->objtype
+#else
+#define STMT_OBJTYPE(stmt) stmt->relkind
+#endif
+
 /* Define ProcessUtility hook proto/parameters following the PostgreSQL version */
 #if PG_VERSION_NUM >= 130000
 #define GTT_PROCESSUTILITY_PROTO PlannedStmt *pstmt, const char *queryString, \
@@ -113,7 +119,11 @@ static post_parse_analyze_hook_type prev_post_parse_analyze_hook = NULL;
 /* Hook to intercept CREATE GLOBAL TEMPORARY TABLE query */
 static void gtt_ProcessUtility(GTT_PROCESSUTILITY_PROTO);
 static void gtt_ExecutorStart(QueryDesc *queryDesc, int eflags);
+#if PG_VERSION_NUM >= 140000
+static void gtt_post_parse_analyze(ParseState *pstate, Query *query, struct JumbleState * jstate);
+#else
 static void gtt_post_parse_analyze(ParseState *pstate, Query *query);
+#endif
 static Oid get_extension_schema(Oid ext_oid);
 
 /* Enable use of Global Temporary Table at session level */
@@ -458,7 +468,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 				break;
 
 			/* do not proceed OBJECT_MATVIEW */
-			if (stmt->relkind != OBJECT_TABLE)
+			if (STMT_OBJTYPE(stmt) != OBJECT_TABLE)
 				break;
 
 			/*
@@ -843,7 +853,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			ListCell   *lcmd;
 			Gtt        gtt;
 
-			if (stmt->relkind != OBJECT_TABLE)
+			if (STMT_OBJTYPE(stmt) != OBJECT_TABLE)
 				break;
 
 			/* Look if the table is declared as GTT */
@@ -1571,7 +1581,11 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
  * Post-parse-analysis hook: mark query with a queryId
  */
 static void
+#if PG_VERSION_NUM >= 140000
+gtt_post_parse_analyze(ParseState *pstate, Query *query, struct JumbleState * jstate)
+#else
 gtt_post_parse_analyze(ParseState *pstate, Query *query)
+#endif
 {
 	if (pgtt_is_enabled && query->rtable != NIL)
 	{
@@ -1656,8 +1670,13 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query)
 	}
 
 	/* restore hook */
-        if (prev_post_parse_analyze_hook)
-                prev_post_parse_analyze_hook(pstate, query);
+        if (prev_post_parse_analyze_hook) {
+#if PG_VERSION_NUM >= 140000
+		prev_post_parse_analyze_hook(pstate, query, jstate);
+#else
+		prev_post_parse_analyze_hook(pstate, query);
+#endif
+	}
 }
 
 static bool
