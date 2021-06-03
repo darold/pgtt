@@ -1243,7 +1243,7 @@ EnableGttManager(void)
 		GttHashTable = hash_create("Global Temporary Table hash list",
 									GTT_PER_DATABASE,
 									&ctl,
-									HASH_ELEM | HASH_CONTEXT);
+									HASH_STRINGS | HASH_ELEM | HASH_CONTEXT);
 		elog(DEBUG1, "GTT cache initialized.");
 	}
 
