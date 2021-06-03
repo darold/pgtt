@@ -73,6 +73,10 @@
 #include "catalog/pg_class.h"
 #endif
 
+#if PG_VERSION_NUM < 90400
+#error Minimum version of PostgreSQL required is 9.4
+#endif
+
 #define CATALOG_GLOBAL_TEMP_REL	"pg_global_temp_tables"
 #define Anum_pgtt_relid   1
 #define Anum_pgtt_relname 3

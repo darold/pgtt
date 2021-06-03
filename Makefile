@@ -6,14 +6,11 @@ PGFILEDESC = "pgtt - Global Temporary Tables for PostgreSQL"
 
 PG_CONFIG = pg_config
 
-PGVEROK = $(shell $(PG_CONFIG) --version | egrep " (9.[456]|1[01234])" > /dev/null && echo yes || echo no)
 PG_CPPFLAGS = -I$(libpq_srcdir) -Wno-uninitialized
 PG_LDFLAGS = -L$(libpq_builddir) -lpq
 PG_LIBDIR := $(shell $(PG_CONFIG) --libdir)
 
 SHLIB_LINK = $(libpq)
-
-ifeq ($(PGVEROK),yes)
 
 DOCS = $(wildcard README*)
 MODULES = pgtt
@@ -27,10 +24,6 @@ TESTS        = 00_init 01_oncommitdelete 02_oncommitpreserve \
 
 REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --inputdir=test
-
-else
-	$(error Minimum version of PostgreSQL required is 9.4)
-endif
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
