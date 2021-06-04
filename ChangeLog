@@ -1,3 +1,37 @@
+Version 2.4 - Jun 04 2021
+
+This version allow use of the extension by non superuser and especially
+the creation and maintenance of GTT. It also fixes compatibility with
+PostgreSQL v14. Here is the full list of changes:
+
+  - Fix FailedAssertion "flags & HASH_STRINGS" with PG14. Thanks to
+    MigOps for the patch.
+  - Check for minimum pg version in the C code instead of Makefile.
+    Thanks to MigOps for the patch.
+  - Fixed compiling for PostgreSQL 14. Thanks to Dmitry Ukolov for
+    the patch.
+  - Fix documentation about privilege to set on pgtt_schema for a
+    non superuser role.
+  - Allow creation and maintenance of Global Temporary Tables by non
+    superuser. This require that the user can use schema pgtt_schema
+    and can write to table pg_schema.pg_global_temp_tables.
+  - The library can now be loaded by the user using:
+	LOAD '$libdir/plugins/pgtt.so';
+    Thanks to Dmitry Ukolov for the feature request.
+  - Fix two crashes when --enable-cassert is used. Thanks to hanson69
+    for the report.
+  - Fix comment and index on PGTT table. Thanks to Dmitry Ukolov for
+    the report.
+  - Fix unexpected error "attempt to create referential integrity
+    constraint on global temporary table" when creating a regular
+    table and fix detection of FK and throw an error on create global
+    temporary table statement. Thanks to Dmitry Ukolov for the report.
+  - Fix impossibility to recreate GTT if it was dropped in another
+    session. Thanks to Dmitry Ukolov for the report.
+  - Remove useless extension's downgrade files. Thanks to MigOps
+    for the patch.
+
+
 Version 2.3 - Apr 02 2021
 
 This version fix the compatibility with PostgreSQL 10 and 11.

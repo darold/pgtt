@@ -73,8 +73,8 @@
 #include "catalog/pg_class.h"
 #endif
 
-#if PG_VERSION_NUM < 90400
-#error Minimum version of PostgreSQL required is 9.4
+#if PG_VERSION_NUM < 90500
+#error Minimum version of PostgreSQL required is 9.5
 #endif
 
 #define CATALOG_GLOBAL_TEMP_REL	"pg_global_temp_tables"
@@ -1243,7 +1243,12 @@ EnableGttManager(void)
 		GttHashTable = hash_create("Global Temporary Table hash list",
 									GTT_PER_DATABASE,
 									&ctl,
-									HASH_STRINGS | HASH_ELEM | HASH_CONTEXT);
+#if PG_VERSION_NUM >= 140000
+									HASH_STRINGS | HASH_ELEM | HASH_CONTEXT
+#else
+									HASH_ELEM | HASH_CONTEXT
+#endif
+						);
 		elog(DEBUG1, "GTT cache initialized.");
 	}
 
