@@ -897,8 +897,14 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			Oid        relid;
 			char       *nspname;
 
-			relid = RangeVarGetRelidExtended(stmt->relation, ShareLock, 0,
-									RangeVarCallbackOwnsRelation, NULL);
+			relid = RangeVarGetRelidExtended(stmt->relation, ShareLock,
+#if (PG_VERSION_NUM >= 110000)
+				       					0,
+#else
+									false, false,
+#endif
+									RangeVarCallbackOwnsRelation,
+									NULL);
 
 			/* Just take care that the GTT is not in use */
 			nspname = get_namespace_name(get_rel_namespace(relid));
@@ -1530,7 +1536,7 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 		{
 			CommentObject((CommentStmt *) cur_stmt);
 		}
-#if (PG_VERSION_NUM >= 100000)
+#if (PG_VERSION_NUM >= 90600)
 		else if (IsA(cur_stmt, TableLikeClause))
 		{
 			TableLikeClause *like = (TableLikeClause *) cur_stmt;
@@ -1563,7 +1569,7 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 								 NULL, NULL,
 								 None_Receiver,
 								 NULL);
-#elif PG_VERSION_NUM >= 90500
+#else
 			ProcessUtility(cur_stmt,
 								 "PGTT provide a query string",
 								 PROCESS_UTILITY_SUBCOMMAND,

@@ -75,7 +75,11 @@ SELECT * FROM t_glob_temptable2;
 -- Must complain that the GTT is in use
 CREATE INDEX ON t_glob_temptable2 (lbl);
 
-\d pgtt_schema.t_glob_temptable2
+SELECT pg_catalog.pg_get_indexdef(i.indexrelid, 0, true)
+FROM pg_catalog.pg_class c, pg_catalog.pg_class c2, pg_catalog.pg_index i
+LEFT JOIN pg_catalog.pg_constraint con ON (conrelid = i.indrelid AND conindid = i.indexrelid AND contype IN ('p','u','x'))
+WHERE c.oid = 'pgtt_schema.t_glob_temptable2'::regclass::oid AND c.oid = i.indrelid AND i.indexrelid = c2.oid
+ORDER BY i.indisprimary DESC, c2.relname;
 
 \c - -
 LOAD 'pgtt';

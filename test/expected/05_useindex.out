@@ -98,14 +98,15 @@ SELECT * FROM t_glob_temptable2;
 -- Must complain that the GTT is in use
 CREATE INDEX ON t_glob_temptable2 (lbl);
 ERROR:  a temporary table has been created and is active, can not add an index on the GTT table in this session.
-\d pgtt_schema.t_glob_temptable2
-  Unlogged table "pgtt_schema.t_glob_temptable2"
- Column |  Type   | Collation | Nullable | Default 
---------+---------+-----------+----------+---------
- id     | integer |           |          | 
- lbl    | text    |           |          | 
-Indexes:
-    "t_glob_temptable2_id_idx" btree (id)
+SELECT pg_catalog.pg_get_indexdef(i.indexrelid, 0, true)
+FROM pg_catalog.pg_class c, pg_catalog.pg_class c2, pg_catalog.pg_index i
+LEFT JOIN pg_catalog.pg_constraint con ON (conrelid = i.indrelid AND conindid = i.indexrelid AND contype IN ('p','u','x'))
+WHERE c.oid = 'pgtt_schema.t_glob_temptable2'::regclass::oid AND c.oid = i.indrelid AND i.indexrelid = c2.oid
+ORDER BY i.indisprimary DESC, c2.relname;
+                                     pg_get_indexdef                                     
+-----------------------------------------------------------------------------------------
+ CREATE INDEX t_glob_temptable2_id_idx ON pgtt_schema.t_glob_temptable2 USING btree (id)
+(1 row)
 
 \c - -
 LOAD 'pgtt';
