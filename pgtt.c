@@ -1111,13 +1111,13 @@ gtt_create_table_statement(Gtt gtt)
 							quote_identifier(gtt.relname))));
 
 	/* Now register the GTT table */
-	newQueryString = psprintf("INSERT INTO %s.pg_global_temp_tables VALUES (%d, '%s', '%s', '%c', '%s')",
+	newQueryString = psprintf("INSERT INTO %s.pg_global_temp_tables VALUES (%d, '%s', '%s', '%c', %s)",
 			quote_identifier(pgtt_namespace_name),
 			gttOid,
 			pgtt_namespace_name,
 			gtt.relname,
 			(gtt.preserved) ? 't' : 'f',
-			gtt.code
+			quote_literal_cstr(gtt.code)
 		);
         result = SPI_exec(newQueryString, 0);
         if (result < 0)
@@ -1933,13 +1933,13 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 	}
 
 	/* Now register the GTT table */
-	newQueryString = psprintf("INSERT INTO %s.pg_global_temp_tables VALUES (%d, '%s', '%s', '%c', '%s')",
+	newQueryString = psprintf("INSERT INTO %s.pg_global_temp_tables VALUES (%d, '%s', '%s', '%c', %s)",
 			quote_identifier(pgtt_namespace_name),
 			gtt.relid,
 			pgtt_namespace_name,
 			gtt.relname,
 			(gtt.preserved) ? 't' : 'f',
-			gtt.code
+			quote_literal_cstr(gtt.code)
 		);
         result = SPI_exec(newQueryString, 0);
         if (result < 0)
