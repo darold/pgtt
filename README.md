@@ -460,7 +460,7 @@ When dumping a database using the pgtt extension, the content of the
 all template unlogged tables. Restoring the dump will recreate the
 database in the same state.
 
-### [Performances](performances)
+### [Performances](#performances)
 
 Overhead of loading the extension but without using it in a pgbench
 tpcb-like scenario.
