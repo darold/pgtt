@@ -90,6 +90,13 @@ PG_MODULE_MAGIC;
 #endif
 
 /* Define ProcessUtility hook proto/parameters following the PostgreSQL version */
+#if PG_VERSION_NUM >= 140000
+#define GTT_PROCESSUTILITY_PROTO PlannedStmt *pstmt, const char *queryString, bool readOnlyTree, \
+					ProcessUtilityContext context, ParamListInfo params, \
+					QueryEnvironment *queryEnv, DestReceiver *dest, \
+					QueryCompletion *qc
+#define GTT_PROCESSUTILITY_ARGS pstmt, queryString, readOnlyTree, context, params, queryEnv, dest, qc
+#else
 #if PG_VERSION_NUM >= 130000
 #define GTT_PROCESSUTILITY_PROTO PlannedStmt *pstmt, const char *queryString, \
 					ProcessUtilityContext context, ParamListInfo params, \
@@ -113,6 +120,7 @@ PG_MODULE_MAGIC;
                                         ParamListInfo params, bool isTopLevel, \
 					DestReceiver *dest, char *completionTag
 #define GTT_PROCESSUTILITY_ARGS parsetree, queryString, params, isTopLevel, dest, completionTag
+#endif
 #endif
 #endif
 
@@ -1563,12 +1571,22 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
                         stmt->utilityStmt       = cur_stmt;
                         stmt->stmt_location     = -1;
                         stmt->stmt_len          = 0;
+#if PG_VERSION_NUM >= 140000
+			ProcessUtility(stmt,
+								 "PGTT provide a query string",
+								 PROCESS_UTILITY_SUBCOMMAND,
+								 true,
+								 NULL, NULL,
+								 None_Receiver,
+								 NULL);
+#else
 			ProcessUtility(stmt,
 								 "PGTT provide a query string",
 								 PROCESS_UTILITY_SUBCOMMAND,
 								 NULL, NULL,
 								 None_Receiver,
 								 NULL);
+#endif
 #else
 			ProcessUtility(cur_stmt,
 								 "PGTT provide a query string",
