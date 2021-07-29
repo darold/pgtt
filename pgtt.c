@@ -73,8 +73,8 @@
 #include "catalog/pg_class.h"
 #endif
 
-#if PG_VERSION_NUM < 90500
-#error Minimum version of PostgreSQL required is 9.5
+#if PG_VERSION_NUM < 90600
+#error Minimum version of PostgreSQL required is 9.6
 #endif
 
 #define CATALOG_GLOBAL_TEMP_REL	"pg_global_temp_tables"
@@ -1474,9 +1474,7 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 
 			elog(DEBUG1, "Creating a temporary table and get its Oid");
                         /* Create a temporary table and save its Oid */
-#if (PG_VERSION_NUM < 90500)
-			temp_relid = DefineRelation((CreateStmt *) cur_stmt, RELKIND_RELATION, temp_relowner);
-#elif (PG_VERSION_NUM < 100000)
+#if (PG_VERSION_NUM < 100000)
 			temp_relid = DefineRelation((CreateStmt *) cur_stmt, RELKIND_RELATION, temp_relowner, NULL).objectId;
 #elif (PG_VERSION_NUM < 130000)
 			temp_relid = DefineRelation((CreateStmt *) cur_stmt, RELKIND_RELATION, temp_relowner, NULL, NULL).objectId;
@@ -1757,10 +1755,8 @@ force_pgtt_namespace (void)
                                                                          search_path.data,
                                                                          (superuser() ? PGC_SUSET : PGC_USERSET),
                                                                          PGC_S_SESSION,
-                                                                         GUC_ACTION_SET, true, 0
-#if PG_VERSION_NUM >= 90500
-									 , false
-#endif
+                                                                         GUC_ACTION_SET, true, 0,
+									 false
 									 );
 	}
 }
