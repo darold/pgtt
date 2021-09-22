@@ -1,3 +1,11 @@
+Version 2.6 - Sep 22 2021
+
+This is a maintenance release to add support for upcomming PostgreSQL 14.
+
+  - Add support to PostgreSQL 14. Thanks to Devrim Gunduz for the report
+    and MigOps Inc for the patch.
+
+
 Version 2.5 - Jun 08 2021
 
 This is a maintenance release to hotfix port on PostgreSQL 9.6.
