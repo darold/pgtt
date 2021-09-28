@@ -1,10 +1,15 @@
 Version 2.6 - Sep 22 2021
 
-This is a maintenance release to add support for upcomming PostgreSQL 14.
+This is a maintenance release to add support for upcomming PostgreSQL 14
+and fixed some issues reported in the past three months.
 
   - Add support to PostgreSQL 14. Thanks to Devrim Gunduz for the report
     and MigOps Inc for the patch.
-
+  - Remove support to PG 9.5 which obviously was not working. Minimal PG
+    version for this extension is 9.6.
+  - Fix documentation menu.
+  - Fix creation of GTT when there is a CHECK constraint with string
+    constant.
 
 Version 2.5 - Jun 08 2021
 
