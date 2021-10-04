@@ -4,7 +4,7 @@ This is a maintenance release to add support for upcomming PostgreSQL 14
 and fixed some issues reported in the past three months.
 
   - Add support to PostgreSQL 14. Thanks to Devrim Gunduz for the report
-    and MigOps Inc for the patch.
+    and Dmitry Ukolov for the patch.
   - Remove support to PG 9.5 which obviously was not working. Minimal PG
     version for this extension is 9.6.
   - Fix documentation menu.
