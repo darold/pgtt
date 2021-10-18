@@ -16,6 +16,7 @@
 #include "miscadmin.h"
 
 #include "access/htup_details.h"
+#include "access/parallel.h"
 #include "access/reloptions.h"
 #include "access/sysattr.h"
 #include "access/xact.h"
@@ -82,6 +83,8 @@
 #define Anum_pgtt_relname 3
 
 PG_MODULE_MAGIC;
+
+#define NOT_IN_PARALLEL_WORKER (ParallelWorkerNumber < 0)
 
 #if PG_VERSION_NUM >= 140000
 #define STMT_OBJTYPE(stmt) stmt->objtype
@@ -235,6 +238,8 @@ _PG_init(void)
 {
 	elog(DEBUG1, "_PG_init()");
 
+	if (ParallelWorkerNumber >= 0)
+		return;
 	/*
 	 * If we are loaded via shared_preload_libraries exit.
 	 */
@@ -349,7 +354,7 @@ gtt_ProcessUtility(GTT_PROCESSUTILITY_PROTO)
 	elog(DEBUG1, "gtt_ProcessUtility()");
 
 	/* Do not waste time here if the feature is not enabled for this session */
-	if (pgtt_is_enabled)
+	if (pgtt_is_enabled && NOT_IN_PARALLEL_WORKER)
 	{
 		/*
 		 * Be sure that extension schema is at end of the search path so that
@@ -388,6 +393,8 @@ gtt_ProcessUtility(GTT_PROCESSUTILITY_PROTO)
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
+
+	elog(DEBUG1, "End of gtt_ProcessUtility()");
 }
 
 /*
@@ -939,7 +946,7 @@ gtt_ExecutorStart(QueryDesc *queryDesc, int eflags)
 	elog(DEBUG1, "gtt_ExecutorStart()");
 
 	/* Do not waste time here if the feature is not enabled for this session */
-	if (pgtt_is_enabled)
+	if (pgtt_is_enabled && NOT_IN_PARALLEL_WORKER)
 	{
 
 		/* check if we are working on a GTT and create it if it doesn't exist */
@@ -961,6 +968,8 @@ gtt_ExecutorStart(QueryDesc *queryDesc, int eflags)
 		prev_ExecutorStart(queryDesc, eflags);
 	else
 		standard_ExecutorStart(queryDesc, eflags);
+
+	elog(DEBUG1, "End of gtt_ExecutorStart()");
 }
 
 static bool
@@ -968,6 +977,7 @@ gtt_table_exists(QueryDesc *queryDesc)
 {
 	bool    is_gtt = false;
 	char    *name = NULL;
+	char    relpersistence;
 	RangeTblEntry *rte;
 	Relation      rel;
 	Gtt           gtt;
@@ -980,23 +990,27 @@ gtt_table_exists(QueryDesc *queryDesc)
 	if (list_length(pstmt->rtable) == 0)
 		return false;
 
-	/* This must be a valid relation */
+	/* This must be a valid relation and not a temporary table */
 	rte = (RangeTblEntry *) linitial(pstmt->rtable);
-	if (rte->relid != InvalidOid)
+	if (rte->relid != InvalidOid && rte->relkind == RELKIND_RELATION
+				&& !is_catalog_relid(rte->relid))
 	{
-		Assert(rte->relkind == RELKIND_RELATION);
-
 #if (PG_VERSION_NUM >= 120000)
 		rel = table_open(rte->relid, NoLock);
 #else
 		rel = heap_open(rte->relid, NoLock);
 #endif
 		name = RelationGetRelationName(rel);
+		relpersistence = rel->rd_rel->relpersistence;
 #if (PG_VERSION_NUM >= 120000)
 		table_close(rel, NoLock);
 #else
 		heap_close(rel, NoLock);
 #endif
+
+		/* Do not go further with temporary tables, catalog or toast table */
+		if (relpersistence != RELPERSISTENCE_TEMP)
+			return false;
 
 		gtt.relid = 0;
 		gtt.temp_relid = 0;
@@ -1615,7 +1629,7 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query, struct JumbleState * js
 gtt_post_parse_analyze(ParseState *pstate, Query *query)
 #endif
 {
-	if (pgtt_is_enabled && query->rtable != NIL)
+	if (NOT_IN_PARALLEL_WORKER && pgtt_is_enabled && query->rtable != NIL)
 	{
 		/* replace the Oid of the template table by our new table in the rtable */
 		RangeTblEntry *rte = (RangeTblEntry *) linitial(query->rtable);
@@ -1720,9 +1734,9 @@ is_catalog_relid(Oid relid)
 	relform = (Form_pg_class) GETSTRUCT(reltup);
         relnamespace = relform->relnamespace;
 	ReleaseSysCache(reltup);
-        if (relnamespace == PG_CATALOG_NAMESPACE)
+        if (relnamespace == PG_CATALOG_NAMESPACE || relnamespace == PG_TOAST_NAMESPACE)
 	{
-		elog(DEBUG1, "relation %d is in pg_catalog schema, nothing to do.", relid);
+		elog(DEBUG1, "relation %d is in pg_catalog or pg_toast schema, nothing to do.", relid);
 		return true;
 	}
 
