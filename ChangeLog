@@ -1,3 +1,15 @@
+Version 2.7 - Nov 23 2021
+
+This is a maintenance release to fix an issue with parallelism
+and improve performances.
+
+  - Prevent code to be executed in parallel processes. Thanks to
+    Dmitry Ukolov for the report.
+  - Improve performances by not looking for an existing GTT table
+    if the table is a temporary table or part of the pg_catalog.
+  - Update ChangeLog to acknowledge patch on PG14 support to Dmitry Ukolov.
+  - Update copyright year.
+
 Version 2.6 - Sep 22 2021
 
 This is a maintenance release to add support for upcomming PostgreSQL 14
