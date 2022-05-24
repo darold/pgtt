@@ -701,7 +701,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 				Value *relationNameValue = NULL;
 				Gtt gtt;
 
-				relationNameList = (List *) linitial(drop->objects);
+				relationNameList = list_copy((List *) linitial(drop->objects));
 				relationNameListLength = list_length(relationNameList);
 
 				switch (relationNameListLength)
@@ -1758,7 +1758,7 @@ force_pgtt_namespace (void)
 	bool               first = true;
 
 	initStringInfo(&search_path);
-	/* verify that sxtension schema is in the path */
+	/* verify that extension schema is in the path */
 	foreach(lc, overridePath->schemas)
 	{
 		schemaId = lfirst_oid(lc);
@@ -1788,6 +1788,7 @@ force_pgtt_namespace (void)
 									 false
 									 );
 	}
+	elog(DEBUG1, "search_path forced to %s.", search_path.data);
 }
 
 /*
