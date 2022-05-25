@@ -459,9 +459,14 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 						A_Const *newcon = makeNode(A_Const);
 						char *str = (char *) get_namespace_name(pgtt_namespace_oid);
 
+#if PG_VERSION_NUM < 150000
 						newcon->val.type = T_String;
 						newcon->val.val.str = pstrdup(str);
-						newcon->type = T_A_Const;
+#else
+						newcon->val.node.type = T_String;
+						newcon->val.sval.sval = pstrdup(str);
+#endif
+						//newcon->type = T_A_Const;
 						newcon->location = strlen(queryString);
 						stmt->args = lappend(stmt->args, newcon);
 					}
@@ -697,8 +702,13 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			{
 				List *relationNameList = NULL;
 				int relationNameListLength = 0;
+#if PG_VERSION_NUM < 150000
 				Value *relationSchemaNameValue = NULL;
 				Value *relationNameValue = NULL;
+#else
+				String *relationSchemaNameValue = NULL;
+				String *relationNameValue = NULL;
+#endif
 				Gtt gtt;
 
 				relationNameList = list_copy((List *) linitial(drop->objects));
@@ -735,7 +745,11 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 				/* prefix with schema name if it is not added already */
 				if (relationSchemaNameValue == NULL)
 				{
+#if PG_VERSION_NUM < 150000
 					Value *schemaNameValue = makeString(pgtt_namespace_name);
+#else
+					String *schemaNameValue = makeString(pgtt_namespace_name);
+#endif
 					relationNameList = lcons(schemaNameValue, relationNameList);
 				}
 
@@ -744,10 +758,19 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 				 * it if it has already been be created and remove
 				 * the cache entry.
 				 */
+#if PG_VERSION_NUM < 150000
 				if (PointerIsValid(relationNameValue->val.str))
+#else
+				if (PointerIsValid(relationNameValue->sval))
+#endif
 				{
 					elog(DEBUG1, "looking for dropping table: %s",
-										relationNameValue->val.str);
+#if PG_VERSION_NUM < 150000
+										relationNameValue->val.str
+#else
+										relationNameValue->sval
+#endif
+										);
 					/* Initialize Gtt object */
 					gtt.relid = 0;
 					gtt.temp_relid = 0;
@@ -756,8 +779,13 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 					gtt.code = NULL;
 					gtt.created = false;
 
+#if PG_VERSION_NUM < 150000
 					elog(DEBUG1, "looking if table %s is a cached GTT", relationNameValue->val.str);
 					GttHashTableLookup(relationNameValue->val.str, gtt);
+#else
+					elog(DEBUG1, "looking if table %s is a cached GTT", relationNameValue->sval);
+					GttHashTableLookup(relationNameValue->sval, gtt);
+#endif
 					if (gtt.relname[0] != '\0')
 					{
 						/*
@@ -784,8 +812,13 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 						 * it from PGTT list if it exists.
 						 */
 						elog(DEBUG1, "looking if table %s is registered as GTT",
+#if PG_VERSION_NUM < 150000
 												relationNameValue->val.str);
 						gtt_unregister_gtt_not_cached(relationNameValue->val.str);
+#else
+												relationNameValue->sval);
+						gtt_unregister_gtt_not_cached(relationNameValue->sval);
+#endif
 					}
 				}
 			}
