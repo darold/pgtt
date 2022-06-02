@@ -1,3 +1,12 @@
+Version 2.8 - Jun 02 2022
+
+This is a maintenance release to add support to PostgreSQL 15
+and fix an error when trying to drop a regular table.
+
+  - Add support to PostgreSQL 15.
+  - Fix impossibility to drop a regular table when the extension is loaded.
+    Thanks to basildba for the report.
+
 Version 2.7 - Nov 23 2021
 
 This is a maintenance release to fix an issue with parallelism
