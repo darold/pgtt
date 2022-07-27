@@ -22,7 +22,7 @@ is to rewrite the code to use standard PostgreSQL temporary tables.
 
 This version of the GTT extension use a regular unlogged table as
 "template" table and an internal rerouting to a temporary table. See
-chapter "How the extension really works?" for more details. A previous
+chapter "How the extension really works" for more details. A previous
 implementation of this extension using Row Security Level is still
 available [here](https://github.com/darold/pgtt-rsl).
 
@@ -46,7 +46,7 @@ becomes bloated and the performances start to fall. Usually Global
 Temporary Tables prevent catalog bloating, but with this implementation
 and even if we have a permanent table, all DML are rerouted to a
 regular temporary table created at first access. See below chapter
-"How the extension really works?" for more information.
+"How the extension really works" for more information.
 
 DECLARE TEMPORARY TABLE statement is not supported by PostgreSQL and
 by this extension. However this statement defines a temporary table
@@ -97,7 +97,7 @@ Specifies whether operations for the table are logged. The default is
 
 With PostgreSQL only `NOT LOGGED ON ROLLBACK DELETE ROWS` can be
 supported. Creation or dropping of the Global Temporary Table are
-logged, see below "How the extension really works?" for the details.
+logged, see below "How the extension really works" for the details.
 
 
 ### [Installation](#installation)
@@ -123,7 +123,7 @@ add the library to the $libdir/plugins/ directory.
 Then it will be possible to use it using `LOAD '$libdir/plugins/pgtt.so';`
 To create and manage GTT using a non-superuser role you will have to grant
 the CREATE privilege on the `pgtt_schema` schema to the user.
-	
+
 To run test execute the following command as superuser:
 
 	make installcheck
@@ -181,7 +181,7 @@ is always at end of the `search_path`.
 	gtt_testdb=# LOAD '$libdir/plugins/pgtt';
 	LOAD
 	gtt_testdb=# SHOW search_path;
-	    search_path     
+	    search_path
 	--------------------
 	 public,pgtt_schema
 	(1 row)
@@ -189,7 +189,7 @@ is always at end of the `search_path`.
 	gtt_testdb=# SET search_path TO appschema,public;
 	SET
 	gtt_testdb=# SHOW search_path;
-		  search_path           
+		  search_path
 	--------------------------------
 	 appschema, public, pgtt_schema
 	(1 row)
@@ -232,7 +232,7 @@ as well as the AS clause WITH DATA or WITH NO DATA (default):
 
 In case of WITH DATA, the extension will fill the GTT with data
 returned from the SELECT statement for the current session only.
- 
+
 PostgreSQL temporary table clause `ON COMMIT DROP` is not supported by
 the extension, GTT are persistent over transactions. If the clause is
 used an error will be raised.
@@ -281,7 +281,7 @@ Even if PostgreSQL allow foreign keys on temporary table, the pgtt extension try
 to mimic as much as possible the same behavior of Oracle and other RDBMS like DB2,
 SQL Server or MySQL.
 
-	ORA-14455: attempt to create referential integrity constraint on temporary table.  
+	ORA-14455: attempt to create referential integrity constraint on temporary table.
 
 #### Partitioning
 
@@ -322,7 +322,7 @@ table:
 	bench=# INSERT INTO test_tt VALUES (1, 'one'), (2, 'two'), (3, 'three');
 	INSERT 0 3
 	bench=# SELECT * FROM pgtt_schema.test_tt;
-	 id |  lbl  
+	 id |  lbl
 	----+-------
 	  1 | one
 	  2 | two
@@ -333,7 +333,7 @@ will actually result in the same as looking at the associated
 temporary table like follow:
 
 	bench=# SELECT * FROM test_tt;
-	 id |  lbl  
+	 id |  lbl
 	----+-------
 	  1 | one
 	  2 | two
@@ -343,7 +343,7 @@ temporary table like follow:
 or
 
 	bench=# SELECT * FROM pg_temp.test_tt;
-	 id |  lbl  
+	 id |  lbl
 	----+-------
 	  1 | one
 	  2 | two
@@ -356,14 +356,14 @@ it contains no rows, you must disable the extension rerouting:
 	bench=# SET pgtt.enabled TO off;
 	SET
 	bench=# SELECT * FROM pgtt_schema.test_tt;
-	 id | lbl 
+	 id | lbl
 	----+-----
 	(0 rows)
 
 	bench=# SET pgtt.enabled TO on;
 	SET
 	bench=# SELECT * FROM pgtt_schema.test_tt;
-	 id |  lbl  
+	 id |  lbl
 	----+-------
 	  1 | one
 	  2 | two
@@ -372,8 +372,8 @@ it contains no rows, you must disable the extension rerouting:
 
 Look at test file for more examples.
 
-This also mean that you can relocated the extension in a dedicated
-namespace. Can be useful if your application's queries use the schema
+This also mean that you can relocate the extension in a dedicated
+namespace. This can be useful if your application's queries use the schema
 qualifier with the table name to access to the GTT and you can't change
 it. See t/sql/relocation.sql for an example. By default the extension
 is not relocatable in an other schema, there is some configuration
@@ -407,13 +407,13 @@ Here is the description of the catalog table:
 
 ```
           Table « pgtt_schema.pg_global_temp_tables »
-  Colonne  |  Type   | Collationnement | NULL-able | Par défaut 
+  Colonne  |  Type   | Collationnement | NULL-able | Par défaut
 -----------+---------+-----------------+-----------+------------
- relid     | integer |                 | not null  | 
- nspname   | name    |                 | not null  | 
- relname   | name    |                 | not null  | 
- preserved | boolean |                 |           | 
- code      | text    |                 |           | 
+ relid     | integer |                 | not null  |
+ nspname   | name    |                 | not null  |
+ relname   | name    |                 | not null  |
+ preserved | boolean |                 |           |
+ code      | text    |                 |           |
 Index :
     "pg_global_temp_tables_nspname_relname_key" UNIQUE CONSTRAINT, btree (nspname, relname)
 ```
@@ -505,7 +505,7 @@ pgbench tpcb-like scenario.
 * Using a regular Temporary Table
 
 ```
-$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f test/bench/bench_use_rtt.sql 
+$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f test/bench/bench_use_rtt.sql
 starting vacuum...end.
 transaction type: test/bench/bench_use_rtt.sql
 scaling factor: 1
@@ -527,7 +527,7 @@ Created using:
 			ON COMMIT DELETE ROWS;
 
 ```
-$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f test/bench/bench_use_gtt.sql 
+$ pgbench -h localhost bench -c 20 -j 4 -T 60 -f test/bench/bench_use_gtt.sql
 starting vacuum...end.
 transaction type: test/bench/bench_use_gtt.sql
 scaling factor: 1
@@ -543,7 +543,7 @@ tps = 292.028832 (excluding connections establishing)
 
 Even if this last test shows a significant performances improvement
 comparing to regular temporary tables, most of the time this will
-not be the case. 
+not be the case.
 
 ### [Authors](#authors)
 
@@ -556,4 +556,3 @@ This extension is free software distributed under the PostgreSQL
 Licence.
 
         Copyright (c) 2018-2022, Gilles Darold
-
