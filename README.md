@@ -293,7 +293,7 @@ on global temporary table.
 
 ### [How the extension really works](#how-the-extension-really-works)
 
-#### Global Temporary Table use
+#### Global Temporary Table usage
 
 When `pgtt.enabled` is true (default) and the extension have been
 loaded (`LOAD 'pgtt';`) the first access to the table using a SELECT,
@@ -425,7 +425,7 @@ Index :
 * `code`: code used at Global Temporary Table creation time.
 
 
-#### Table removing
+#### Table removing
 
 The extension intercept the call to `DROP TABLE` and look in the
 `pg_global_temp_tables` table to see if it is declared. When it is
