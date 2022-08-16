@@ -1,3 +1,12 @@
+Version 2.9 - Aug 16 2022
+
+This is a maintenance release per CVE-2022-2625 and new PostgreSQL minor
+versions updates.
+
+  - Remove creation of the pgtt_schema if it not exists from extension
+    files per CVE-2022-2625. Thanks to Dmitry Ukolov for the report.
+  - Add regression test for regular table drop.
+
 Version 2.8 - Jun 02 2022
 
 This is a maintenance release to add support to PostgreSQL 15
