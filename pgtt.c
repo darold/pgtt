@@ -1440,6 +1440,7 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
         Oid                         parent_nsp;
         char                       *parent_name,
                                    *parent_nsp_name;
+        char                        parent_persistence;
 
         /* Elements of the "CREATE TABLE" query tree */
         RangeVar                   *parent_rv;
@@ -1460,9 +1461,11 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
         parent_name = get_rel_name(parent_relid);
         parent_nsp = get_rel_namespace(parent_relid);
         parent_nsp_name = get_namespace_name(parent_nsp);
+        parent_persistence = get_rel_persistence(parent_relid);
 
         /* Make up parent's RangeVar */
         parent_rv = makeRangeVar(parent_nsp_name, parent_name, -1);
+        parent_rv->relpersistence = parent_persistence;
 
 	elog(DEBUG1, "Parent namespace: %s, parent relname: %s, parent oid: %d",
 									parent_rv->schemaname,
