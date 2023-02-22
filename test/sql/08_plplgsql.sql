@@ -62,6 +62,7 @@ SELECT * FROM t_glob_temptable1;
 LOAD 'pgtt';
 
 SET pgtt.enabled TO off;
+VACUUM pg_class;
 
 -- Verify that only the temporary table have been dropped
 -- Only the "template" unlogged table should exists
