@@ -1077,12 +1077,6 @@ gtt_table_exists(QueryDesc *queryDesc)
 					elog(ERROR, "can not create global temporary table %s", gtt.relname);
 			}
 			is_gtt = true;
-			if (queryDesc->operation == CMD_INSERT
-					|| queryDesc->operation == CMD_DELETE
-					|| queryDesc->operation == CMD_UPDATE)
-				LockRelationOid(gtt.temp_relid, RowExclusiveLock);
-			else
-				LockRelationOid(gtt.temp_relid, AccessShareLock);
 		}
 		else
 			/* the table is not a global temporary table do nothing*/
@@ -1650,6 +1644,9 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 #endif
 			CommandCounterIncrement();
         }
+
+	/* release lock on creation template relation */
+        UnlockRelationOid(parent_relid, ShareUpdateExclusiveLock);
 
 	elog(DEBUG1, "Create a temporary table done with Oid: %d", temp_relid);
         return temp_relid;
