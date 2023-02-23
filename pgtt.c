@@ -1603,9 +1603,7 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 		else
 		{
 			/*
-			 * Recurse for anything else.  Note the recursive
-			 * call will stash the objects so created into our
-			 * event trigger context.
+			 * Recurse for anything else.
 			 */
 #if PG_VERSION_NUM >= 100000
                         PlannedStmt *stmt = makeNode(PlannedStmt);
@@ -1645,7 +1643,7 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 			CommandCounterIncrement();
         }
 
-	/* release lock on creation template relation */
+	/* release lock on "template" relation */
         UnlockRelationOid(parent_relid, ShareUpdateExclusiveLock);
 
 	elog(DEBUG1, "Create a temporary table done with Oid: %d", temp_relid);
