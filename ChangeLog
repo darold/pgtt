@@ -1,3 +1,18 @@
+Version 2.10 - Feb 23 2023
+
+This is a maintenance release to fix a lock issue in multi parallel process
+environment, many locks were generated. Here is the complete list of changes.
+
+  - Delegate locks on per session temporary tables to PostgreSQL when the table
+    will be used.
+  - Release lock on parent table after temporary table creation based on this
+    relation. Thanks to jayhsiang and liyaojinli for the report.
+  - Use vacuum in test 08 to not look at pg_class too early before the temporary
+    table is remove.
+  - Fix setting default value of the parent table's persistence that can be
+    misleading in future development. Thanks to songjinzhou for the patch.
+  - Fix documentation. Thanks to Luca Ferrari for the patch.
+
 Version 2.9 - Aug 16 2022
 
 This is a maintenance release per CVE-2022-2625 and new PostgreSQL minor
