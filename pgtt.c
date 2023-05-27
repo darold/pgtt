@@ -140,7 +140,9 @@ static void gtt_post_parse_analyze(ParseState *pstate, Query *query, struct Jumb
 #else
 static void gtt_post_parse_analyze(ParseState *pstate, Query *query);
 #endif
+#if PG_VERSION_NUM < 160000
 static Oid get_extension_schema(Oid ext_oid);
+#endif
 
 /* Enable use of Global Temporary Table at session level */
 bool pgtt_is_enabled = true;
@@ -1323,18 +1325,18 @@ void
 GttHashTableDeleteAll(void)
 {
         HASH_SEQ_STATUS status;
-        GttHashEnt *hentry = NULL;
+        GttHashEnt *lentry = NULL;
 
         if (GttHashTable == NULL)
                 return;
 
         hash_seq_init(&status, GttHashTable);
-        while ((hentry = (GttHashEnt *) hash_seq_search(&status)) != NULL)
+        while ((lentry = (GttHashEnt *) hash_seq_search(&status)) != NULL)
         {
-		Gtt          gtt = GetGttByName(hentry->name);
+		Gtt          gtt = GetGttByName(lentry->name);
 
 		elog(DEBUG1, "Remove GTT %s from our hash table", gtt.relname);
-		GttHashTableDelete(hentry->name);
+		GttHashTableDelete(lentry->name);
 		/* Restart the iteration in case that led to other drops */
 		hash_seq_term(&status);
 		hash_seq_init(&status, GttHashTable);
@@ -1574,6 +1576,9 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 #if (PG_VERSION_NUM >= 110000)
 						InvalidOid, /* no parent index */
 						InvalidOid, /* no parent constraint */
+#endif
+#if (PG_VERSION_NUM >= 160000)
+						-1,/* total parts */
 #endif
 						false,  /* is_alter_table */
 						true,   /* check_rights */
@@ -1855,6 +1860,7 @@ gtt_update_registered_table(Gtt gtt)
 		ereport(ERROR, (errmsg("could not disconnect from SPI manager")));
 }
 
+#if PG_VERSION_NUM < 160000
 static Oid
 get_extension_schema(Oid ext_oid)
 {
@@ -1900,6 +1906,7 @@ get_extension_schema(Oid ext_oid)
 
 	return result;
 }
+#endif
 
 /*
  * Create the temporary table related to a Global Temporary Table
