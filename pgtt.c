@@ -1737,6 +1737,15 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query)
 
 				if (rte->relid != gtt.temp_relid)
 				{
+#if PG_VERSION_NUM >= 160000
+					RTEPermissionInfo *rteperm = list_nth(query->rteperminfos,
+											rte->perminfoindex - 1);
+
+					rte->relid = gtt.temp_relid;
+					rteperm->relid = gtt.temp_relid;
+					if (rte->rellockmode != AccessShareLock)
+						LockRelationOid(rte->relid, rte->rellockmode);
+#endif
 					elog(DEBUG1, "rerouting relid %d access to %d for GTT table \"%s\"", rte->relid, gtt.temp_relid, name);
 					rte->relid = gtt.temp_relid;
 				}
@@ -1861,6 +1870,9 @@ gtt_update_registered_table(Gtt gtt)
 }
 
 #if PG_VERSION_NUM < 160000
+/*
+ * From src/backend/commands/extension.c
+ */
 static Oid
 get_extension_schema(Oid ext_oid)
 {
