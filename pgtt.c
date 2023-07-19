@@ -25,6 +25,7 @@
 #include "catalog/namespace.h"
 #include "catalog/objectaccess.h"
 #include "catalog/pg_authid.h"
+#include "catalog/pg_collation.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_namespace.h"
@@ -63,10 +64,7 @@
 #endif
 
 /* for regexp search */
-#if PG_VERSION_NUM >= 100000
-#include "utils/regproc.h"
-#endif
-#include <regex.h>
+#include "regex/regexport.h"
 
 #if (PG_VERSION_NUM >= 120000)
 #include "access/genam.h"
@@ -150,6 +148,8 @@ bool pgtt_is_enabled = true;
 /* Regular expression search */
 static regex_t create_global_regexv;
 static regex_t create_with_fk_regexv;
+static void RE_compile(regex_t *regex, text *text_re,
+					   int cflags, Oid collation);
 
 /* Oid and name of pgtt extrension schema in the database */
 Oid pgtt_namespace_oid = InvalidOid;
@@ -280,15 +280,12 @@ _PG_init(void)
 	 * Compile regular expression to detect in UtilityHook
 	 * a CREATE GLOBAL TEMPORARY TABLE statement
 	 */
-	if (regcomp(&create_global_regexv, "^\\s*CREATE\\s+(\\/\\*\\s*)?GLOBAL(\\s*\\*\\/)?",
-					REG_NOSUB|REG_EXTENDED|REG_NEWLINE|REG_ICASE) != 0)
-		ereport(ERROR, (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-			errmsg("PGTT: invalid statement regexp pattern %s", "^\\s*CREATE\\s+(\\/\\*\\s*)?GLOBAL(\\s*\\*\\/)?\\s+")));
+	RE_compile(&create_global_regexv, cstring_to_text("^\\s*CREATE\\s+(\\/\\*\\s*)?GLOBAL(\\s*\\*\\/)?"),
+					REG_NOSUB|REG_ADVANCED|REG_NEWLINE|REG_ICASE, DEFAULT_COLLATION_OID);
+
 	/* Compute regexp to detect FOREIGN KEY clause in create statement */
-	if (regcomp(&create_with_fk_regexv, "\\s*FOREIGN\\s+KEY",
-					REG_NOSUB|REG_EXTENDED|REG_NEWLINE|REG_ICASE) != 0)
-		ereport(ERROR, (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-			errmsg("PGTT: invalid statement regexp pattern %s", "\\s*FOREIGN\\s+KEY")));
+	RE_compile(&create_with_fk_regexv, cstring_to_text("\\s*FOREIGN\\s+KEY"),
+					REG_NOSUB|REG_ADVANCED|REG_NEWLINE|REG_ICASE, DEFAULT_COLLATION_OID);
 
 	if (GttHashTable == NULL)
 	{
@@ -346,8 +343,8 @@ exitHook(int code, Datum arg)
         elog(DEBUG1, "exiting with %d", code);
 
 	/* Freeing precompiled regex */
-	regfree(&create_global_regexv);
-	regfree(&create_with_fk_regexv);
+	pg_regfree(&create_global_regexv);
+	pg_regfree(&create_with_fk_regexv);
 }
 
 static void
@@ -483,6 +480,13 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			int i;
 			CreateTableAsStmt *stmt = (CreateTableAsStmt *)parsetree;
 			bool skipdata = stmt->into->skipData;
+			int  src_text_len = strlen(queryString);
+			pg_wchar *data;
+			size_t data_len;
+			regmatch_t pmatch[10];             /* main match */
+			int nmatch = 1;
+			int regexec_result;
+			char errMsg[100];
 
 			/* Get the name of the relation */
 			name = stmt->into->rel->relname;
@@ -504,11 +508,32 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			if (stmt->into->rel->relpersistence != RELPERSISTENCE_TEMP)
 				break;
 
+			/* Convert data string to wide characters. */
+			data = (pg_wchar *) palloc((src_text_len + 1) * sizeof(pg_wchar));
+			data_len = pg_mb2wchar_with_len(queryString, data, src_text_len);
+
 			/* 
 			 * We only take care here of statements with the GLOBAL keyword
 			 * even if it is deprecated and generate a warning.
 			 */
-			if (regexec(&create_global_regexv, queryString, 0, 0, 0) != 0)
+			regexec_result = pg_regexec(&create_global_regexv, data, data_len, 0,
+                                                                        NULL,   /* no details */
+                                                                        nmatch,
+                                                                        pmatch,
+                                                                        0);
+			
+			if (regexec_result != REG_OKAY && regexec_result != REG_NOMATCH)
+			{
+				/* re failed??? */
+				pg_regerror(regexec_result, &create_global_regexv, errMsg, sizeof(errMsg));
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
+						 errmsg("regular expression failed (create_global_regexv): %s", errMsg)));
+			}
+
+			pfree(data);
+
+			if (regexec_result == REG_NOMATCH)
 				break;
 
 			/*
@@ -588,6 +613,13 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			CreateStmt *stmt = (CreateStmt *)parsetree;
 			Gtt        gtt;
 			int        len, i, start = 0, end = 0;
+			int  src_text_len = strlen(queryString);
+			pg_wchar *data;
+			size_t data_len;
+			regmatch_t pmatch[10];             /* main match */
+			int nmatch = 1;
+			int regexec_result;
+			char errMsg[100];
 
 			/* Get the name of the relation */
 			name = stmt->relation->relname;
@@ -598,18 +630,59 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			if (stmt->relation->relpersistence != RELPERSISTENCE_TEMP)
 				break;
 
+			/* Convert data string to wide characters. */
+			data = (pg_wchar *) palloc((src_text_len + 1) * sizeof(pg_wchar));
+			data_len = pg_mb2wchar_with_len(queryString, data, src_text_len);
+
 			/* 
 			 * We only take care here of statements with the GLOBAL keyword
 			 * even if it is deprecated and generate a warning.
 			 */
-			if (regexec(&create_global_regexv, queryString, 0, 0, 0) != 0)
-				break;
+                        regexec_result = pg_regexec(&create_global_regexv, data, data_len, 0,
+                                                                        NULL,   /* no details */
+                                                                        nmatch,
+                                                                        pmatch,
+                                                                        0);
+
+			if (regexec_result != REG_OKAY && regexec_result != REG_NOMATCH)
+			{
+				/* re failed??? */
+				pg_regerror(regexec_result, &create_global_regexv, errMsg, sizeof(errMsg));
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
+						 errmsg("regular expression failed (create_global_regexv): %s", errMsg)));
+			}
+
+                        if (regexec_result == REG_NOMATCH)
+			{
+				pfree(data);
+                                break;
+			}
 
 			/* Check if there is foreign key defined in the statement */
-			if (regexec(&create_with_fk_regexv, queryString, 0, 0, 0) == 0)
+                        regexec_result = pg_regexec(&create_with_fk_regexv, data, data_len, 0,
+                                                                        NULL,   /* no details */
+                                                                        nmatch,
+                                                                        pmatch,
+                                                                        0);
+
+			if (regexec_result != REG_OKAY && regexec_result != REG_NOMATCH)
+			{
+				/* re failed??? */
+				pg_regerror(regexec_result, &create_with_fk_regexv, errMsg, sizeof(errMsg));
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
+						 errmsg("regular expression failed (create_with_fk_regexv): %s", errMsg)));
+			}
+
+			pfree(data);
+
+                        if (regexec_result != REG_NOMATCH)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 						 errmsg("attempt to create referential integrity constraint on global temporary table")));
+
+
 #if (PG_VERSION_NUM >= 100000)
 			/*
 			 * We do not allow partitioning on GTT, not that PostgreSQL can
@@ -2046,5 +2119,44 @@ strremovestr(char *src, char *toremove)
 		++src;
 	}
 	return 0;
+}
+
+/*
+ * Compile regex string into struct at *regex.
+ * NB: pg_regfree must be applied to regex if this completes successfully.
+ */
+static void
+RE_compile(regex_t *regex, text *text_re, int cflags, Oid collation)
+{
+	int         text_re_len = VARSIZE_ANY_EXHDR(text_re);
+	char       *text_re_val = VARDATA_ANY(text_re);
+	pg_wchar   *pattern;
+	int         pattern_len;
+	int         regcomp_result;
+	char        errMsg[100];
+
+	/* Convert pattern string to wide characters */
+	pattern = (pg_wchar *) palloc((text_re_len + 1) * sizeof(pg_wchar));
+	pattern_len = pg_mb2wchar_with_len(text_re_val,
+									   pattern,
+									   text_re_len);
+
+	/* Compile regex */
+	regcomp_result = pg_regcomp(regex,
+								pattern,
+								pattern_len,
+								cflags,
+								collation);
+
+	pfree(pattern);
+
+	if (regcomp_result != REG_OKAY)
+	{
+		/* re didn't compile (no need for pg_regfree, if so) */
+		pg_regerror(regcomp_result, regex, errMsg, sizeof(errMsg));
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
+				 errmsg("invalid regular expression: %s", errMsg)));
+	}
 }
 
