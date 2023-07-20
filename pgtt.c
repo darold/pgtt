@@ -839,13 +839,11 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 				if (PointerIsValid(relationNameValue->sval))
 #endif
 				{
-					elog(DEBUG1, "looking for dropping table: %s",
 #if PG_VERSION_NUM < 150000
-										relationNameValue->val.str
+					elog(DEBUG1, "looking for dropping table: %s", relationNameValue->val.str);
 #else
-										relationNameValue->sval
+					elog(DEBUG1, "looking for dropping table: %s", relationNameValue->sval);
 #endif
-										);
 					/* Initialize Gtt object */
 					gtt.relid = 0;
 					gtt.temp_relid = 0;
@@ -886,12 +884,11 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 						 * Table is not on current session cache but remove
 						 * it from PGTT list if it exists.
 						 */
-						elog(DEBUG1, "looking if table %s is registered as GTT",
 #if PG_VERSION_NUM < 150000
-												relationNameValue->val.str);
+						elog(DEBUG1, "looking if table %s is registered as GTT", relationNameValue->val.str);
 						gtt_unregister_gtt_not_cached(relationNameValue->val.str);
 #else
-												relationNameValue->sval);
+						elog(DEBUG1, "looking if table %s is registered as GTT", relationNameValue->sval);
 						gtt_unregister_gtt_not_cached(relationNameValue->sval);
 #endif
 					}
