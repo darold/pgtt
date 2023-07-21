@@ -149,7 +149,9 @@ bool pgtt_is_enabled = true;
 static regex_t create_global_regexv;
 static regex_t create_with_fk_regexv;
 static void RE_compile(regex_t *regex, text *text_re,
-					   int cflags, Oid collation);
+						int cflags, Oid collation);
+static bool RE_execute(regex_t *re, char *dat, int dat_len,
+						int nmatch, regmatch_t *pmatch);
 
 /* Oid and name of pgtt extrension schema in the database */
 Oid pgtt_namespace_oid = InvalidOid;
@@ -480,13 +482,9 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			int i;
 			CreateTableAsStmt *stmt = (CreateTableAsStmt *)parsetree;
 			bool skipdata = stmt->into->skipData;
-			int  src_text_len = strlen(queryString);
-			pg_wchar *data;
-			size_t data_len;
-			regmatch_t pmatch[10];             /* main match */
+			regmatch_t pmatch[10];
 			int nmatch = 1;
-			int regexec_result;
-			char errMsg[100];
+			bool regexec_result;
 
 			/* Get the name of the relation */
 			name = stmt->into->rel->relname;
@@ -508,32 +506,16 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			if (stmt->into->rel->relpersistence != RELPERSISTENCE_TEMP)
 				break;
 
-			/* Convert data string to wide characters. */
-			data = (pg_wchar *) palloc((src_text_len + 1) * sizeof(pg_wchar));
-			data_len = pg_mb2wchar_with_len(queryString, data, src_text_len);
-
 			/* 
 			 * We only take care here of statements with the GLOBAL keyword
 			 * even if it is deprecated and generate a warning.
 			 */
-			regexec_result = pg_regexec(&create_global_regexv, data, data_len, 0,
-                                                                        NULL,   /* no details */
-                                                                        nmatch,
-                                                                        pmatch,
-                                                                        0);
+			regexec_result = RE_execute(&create_global_regexv, (char *) queryString,
+											strlen(queryString),
+											nmatch,
+											pmatch);
 			
-			if (regexec_result != REG_OKAY && regexec_result != REG_NOMATCH)
-			{
-				/* re failed??? */
-				pg_regerror(regexec_result, &create_global_regexv, errMsg, sizeof(errMsg));
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
-						 errmsg("regular expression failed (create_global_regexv): %s", errMsg)));
-			}
-
-			pfree(data);
-
-			if (regexec_result == REG_NOMATCH)
+			if (!regexec_result)
 				break;
 
 			/*
@@ -613,13 +595,9 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			CreateStmt *stmt = (CreateStmt *)parsetree;
 			Gtt        gtt;
 			int        len, i, start = 0, end = 0;
-			int  src_text_len = strlen(queryString);
-			pg_wchar *data;
-			size_t data_len;
 			regmatch_t pmatch[10];             /* main match */
 			int nmatch = 1;
-			int regexec_result;
-			char errMsg[100];
+			bool regexec_result;
 
 			/* Get the name of the relation */
 			name = stmt->relation->relname;
@@ -630,54 +608,25 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			if (stmt->relation->relpersistence != RELPERSISTENCE_TEMP)
 				break;
 
-			/* Convert data string to wide characters. */
-			data = (pg_wchar *) palloc((src_text_len + 1) * sizeof(pg_wchar));
-			data_len = pg_mb2wchar_with_len(queryString, data, src_text_len);
-
 			/* 
 			 * We only take care here of statements with the GLOBAL keyword
 			 * even if it is deprecated and generate a warning.
 			 */
-                        regexec_result = pg_regexec(&create_global_regexv, data, data_len, 0,
-                                                                        NULL,   /* no details */
-                                                                        nmatch,
-                                                                        pmatch,
-                                                                        0);
+			regexec_result = RE_execute(&create_global_regexv, (char *) queryString,
+											strlen(queryString),
+											nmatch,
+											pmatch);
 
-			if (regexec_result != REG_OKAY && regexec_result != REG_NOMATCH)
-			{
-				/* re failed??? */
-				pg_regerror(regexec_result, &create_global_regexv, errMsg, sizeof(errMsg));
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
-						 errmsg("regular expression failed (create_global_regexv): %s", errMsg)));
-			}
-
-                        if (regexec_result == REG_NOMATCH)
-			{
-				pfree(data);
+                        if (!regexec_result)
                                 break;
-			}
 
 			/* Check if there is foreign key defined in the statement */
-                        regexec_result = pg_regexec(&create_with_fk_regexv, data, data_len, 0,
-                                                                        NULL,   /* no details */
-                                                                        nmatch,
-                                                                        pmatch,
-                                                                        0);
+			regexec_result = RE_execute(&create_with_fk_regexv, (char *) queryString,
+											strlen(queryString),
+											nmatch,
+											pmatch);
 
-			if (regexec_result != REG_OKAY && regexec_result != REG_NOMATCH)
-			{
-				/* re failed??? */
-				pg_regerror(regexec_result, &create_with_fk_regexv, errMsg, sizeof(errMsg));
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
-						 errmsg("regular expression failed (create_with_fk_regexv): %s", errMsg)));
-			}
-
-			pfree(data);
-
-                        if (regexec_result != REG_NOMATCH)
+                        if (regexec_result)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 						 errmsg("attempt to create referential integrity constraint on global temporary table")));
@@ -2118,6 +2067,10 @@ strremovestr(char *src, char *toremove)
 	return 0;
 }
 
+/****************************************************************
+ * Functions definition copied from src/backend/utils/adt/regexp.c
+ */
+
 /*
  * Compile regex string into struct at *regex.
  * NB: pg_regfree must be applied to regex if this completes successfully.
@@ -2156,4 +2109,80 @@ RE_compile(regex_t *regex, text *text_re, int cflags, Oid collation)
 				 errmsg("invalid regular expression: %s", errMsg)));
 	}
 }
+
+/*
+ * RE_wchar_execute - execute a RE on pg_wchar data
+ *
+ * Returns true on match, false on no match
+ *
+ *      re --- the compiled pattern as returned by RE_compile_and_cache
+ *      data --- the data to match against (need not be null-terminated)
+ *      data_len --- the length of the data string
+ *      start_search -- the offset in the data to start searching
+ *      nmatch, pmatch  --- optional return area for match details
+ *
+ * Data is given as array of pg_wchar which is what Spencer's regex package
+ * wants.
+ */
+static bool
+RE_wchar_execute(regex_t *re, pg_wchar *data, int data_len,
+                                 int start_search, int nmatch, regmatch_t *pmatch)
+{
+	int             regexec_result;
+	char            errMsg[100];
+
+	/* Perform RE match and return result */
+	regexec_result = pg_regexec(re,
+								data,
+								data_len,
+								start_search,
+								NULL,   /* no details */
+								nmatch,
+								pmatch,
+								0);
+
+	if (regexec_result != REG_OKAY && regexec_result != REG_NOMATCH)
+	{
+		/* re failed??? */
+		pg_regerror(regexec_result, re, errMsg, sizeof(errMsg));
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
+				 errmsg("regular expression failed: %s", errMsg)));
+	}
+
+	return (regexec_result == REG_OKAY);
+}
+
+/*
+ * RE_execute - execute a RE
+ *
+ * Returns true on match, false on no match
+ *
+ *      re --- the compiled pattern as returned by RE_compile_and_cache
+ *      dat --- the data to match against (need not be null-terminated)
+ *      dat_len --- the length of the data string
+ *      nmatch, pmatch  --- optional return area for match details
+ *
+ * Data is given in the database encoding.  We internally
+ * convert to array of pg_wchar which is what Spencer's regex package wants.
+ */
+static bool
+RE_execute(regex_t *re, char *dat, int dat_len,
+                   int nmatch, regmatch_t *pmatch)
+{
+	pg_wchar   *data;
+	int                     data_len;
+	bool            match;
+
+	/* Convert data string to wide characters */
+	data = (pg_wchar *) palloc((dat_len + 1) * sizeof(pg_wchar));
+	data_len = pg_mb2wchar_with_len(dat, data, dat_len);
+
+	/* Perform RE match and return result */
+	match = RE_wchar_execute(re, data, data_len, 0, nmatch, pmatch);
+
+	pfree(data);
+	return match;
+}
+
 
