@@ -1814,7 +1814,11 @@ is_catalog_relid(Oid relid)
 static void
 force_pgtt_namespace (void)
 {
+#if PG_VERSION_NUM >= 160000
+	SearchPathMatcher  *overridePath = GetSearchPathMatcher(CurrentMemoryContext);
+#else
 	OverrideSearchPath *overridePath = GetOverrideSearchPath(CurrentMemoryContext);
+#endif
 	ListCell           *lc;
 	Oid                schemaId = InvalidOid;
 	StringInfoData     search_path;
