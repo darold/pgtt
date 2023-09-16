@@ -6,7 +6,7 @@ PGFILEDESC = "pgtt - Global Temporary Tables for PostgreSQL"
 
 PG_CONFIG = pg_config
 
-PG_CPPFLAGS = -I$(libpq_srcdir) -Wno-uninitialized
+PG_CPPFLAGS = -I$(libpq_srcdir) -Wno-uninitialized -Wno-ignored-attributes
 PG_LDFLAGS = -L$(libpq_builddir) -lpq
 PG_LIBDIR := $(shell $(PG_CONFIG) --libdir)
 
