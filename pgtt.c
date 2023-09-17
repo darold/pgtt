@@ -282,7 +282,7 @@ _PG_init(void)
 	 * Compile regular expression to detect in UtilityHook
 	 * a CREATE GLOBAL TEMPORARY TABLE statement
 	 */
-	RE_compile(&create_global_regexv, cstring_to_text("^\\s*CREATE\\s+(\\/\\*\\s*)?GLOBAL(\\s*\\*\\/)?"),
+	RE_compile(&create_global_regexv, cstring_to_text("^\\s*CREATE\\s+(?:\\/\\*\\s*)?GLOBAL(?:\\s*\\*\\/)?"),
 					REG_NOSUB|REG_ADVANCED|REG_NEWLINE|REG_ICASE, DEFAULT_COLLATION_OID);
 
 	/* Compute regexp to detect FOREIGN KEY clause in create statement */
