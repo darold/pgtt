@@ -72,8 +72,8 @@
 #include "catalog/pg_class.h"
 #endif
 
-#if PG_VERSION_NUM < 90600
-#error Minimum version of PostgreSQL required is 9.6
+#if PG_VERSION_NUM < 120000
+#error Minimum version of PostgreSQL required is 12
 #endif
 
 #define CATALOG_GLOBAL_TEMP_REL	"pg_global_temp_tables"
