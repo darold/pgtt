@@ -139,19 +139,15 @@ static void gtt_post_parse_analyze(ParseState *pstate, Query *query, struct Jumb
 static void gtt_post_parse_analyze(ParseState *pstate, Query *query);
 #endif
 #if PG_VERSION_NUM < 160000
-static Oid get_extension_schema(Oid ext_oid);
+Oid get_extension_schema(Oid ext_oid);
 #endif
 
 /* Enable use of Global Temporary Table at session level */
 bool pgtt_is_enabled = true;
 
 /* Regular expression search */
-static regex_t create_global_regexv;
-static regex_t create_with_fk_regexv;
-static void RE_compile(regex_t *regex, text *text_re,
-						int cflags, Oid collation);
-static bool RE_execute(regex_t *re, char *dat, int dat_len,
-						int nmatch, regmatch_t *pmatch);
+#define CREATE_GLOBAL_REGEXP "^\\s*CREATE\\s+(?:\\/\\*\\s*)?GLOBAL(?:\\s*\\*\\/)?"
+#define CREATE_WITH_FK_REGEXP "\\s*FOREIGN\\s+KEY"
 
 /* Oid and name of pgtt extrension schema in the database */
 Oid pgtt_namespace_oid = InvalidOid;
@@ -278,17 +274,6 @@ _PG_init(void)
 							NULL,
 							NULL);
 
-	/*
-	 * Compile regular expression to detect in UtilityHook
-	 * a CREATE GLOBAL TEMPORARY TABLE statement
-	 */
-	RE_compile(&create_global_regexv, cstring_to_text("^\\s*CREATE\\s+(?:\\/\\*\\s*)?GLOBAL(?:\\s*\\*\\/)?"),
-					REG_NOSUB|REG_ADVANCED|REG_NEWLINE|REG_ICASE, DEFAULT_COLLATION_OID);
-
-	/* Compute regexp to detect FOREIGN KEY clause in create statement */
-	RE_compile(&create_with_fk_regexv, cstring_to_text("\\s*FOREIGN\\s+KEY"),
-					REG_NOSUB|REG_ADVANCED|REG_NEWLINE|REG_ICASE, DEFAULT_COLLATION_OID);
-
 	if (GttHashTable == NULL)
 	{
 		/* Initialize list of Global Temporary Table */
@@ -343,10 +328,6 @@ void
 exitHook(int code, Datum arg)
 {
         elog(DEBUG1, "exiting with %d", code);
-
-	/* Freeing precompiled regex */
-	pg_regfree(&create_global_regexv);
-	pg_regfree(&create_with_fk_regexv);
 }
 
 static void
@@ -482,8 +463,6 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			int i;
 			CreateTableAsStmt *stmt = (CreateTableAsStmt *)parsetree;
 			bool skipdata = stmt->into->skipData;
-			regmatch_t pmatch[10];
-			int nmatch = 1;
 			bool regexec_result;
 
 			/* Get the name of the relation */
@@ -510,10 +489,14 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			 * We only take care here of statements with the GLOBAL keyword
 			 * even if it is deprecated and generate a warning.
 			 */
-			regexec_result = RE_execute(&create_global_regexv, (char *) queryString,
-											strlen(queryString),
-											nmatch,
-											pmatch);
+			regexec_result = RE_compile_and_execute(
+					cstring_to_text(CREATE_GLOBAL_REGEXP),
+					VARDATA_ANY(cstring_to_text((char *) queryString)),
+					VARSIZE_ANY_EXHDR(cstring_to_text((char *) queryString)),
+					REG_ADVANCED | REG_ICASE | REG_NEWLINE,
+					DEFAULT_COLLATION_OID,
+					0, NULL);
+
 			
 			if (!regexec_result)
 				break;
@@ -595,8 +578,6 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			CreateStmt *stmt = (CreateStmt *)parsetree;
 			Gtt        gtt;
 			int        len, i, start = 0, end = 0;
-			regmatch_t pmatch[10];             /* main match */
-			int nmatch = 1;
 			bool regexec_result;
 
 			/* Get the name of the relation */
@@ -612,20 +593,25 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			 * We only take care here of statements with the GLOBAL keyword
 			 * even if it is deprecated and generate a warning.
 			 */
-			regexec_result = RE_execute(&create_global_regexv, (char *) queryString,
-											strlen(queryString),
-											nmatch,
-											pmatch);
+			regexec_result = RE_compile_and_execute(
+					cstring_to_text(CREATE_GLOBAL_REGEXP),
+					VARDATA_ANY(cstring_to_text((char *) queryString)),
+					VARSIZE_ANY_EXHDR(cstring_to_text((char *) queryString)),
+					REG_ADVANCED | REG_ICASE | REG_NEWLINE,
+					DEFAULT_COLLATION_OID,
+					0, NULL);
 
                         if (!regexec_result)
                                 break;
 
 			/* Check if there is foreign key defined in the statement */
-			regexec_result = RE_execute(&create_with_fk_regexv, (char *) queryString,
-											strlen(queryString),
-											nmatch,
-											pmatch);
-
+			regexec_result = RE_compile_and_execute(
+					cstring_to_text(CREATE_WITH_FK_REGEXP),
+					VARDATA_ANY(cstring_to_text((char *) queryString)),
+					VARSIZE_ANY_EXHDR(cstring_to_text((char *) queryString)),
+					REG_ADVANCED | REG_ICASE | REG_NEWLINE,
+					DEFAULT_COLLATION_OID,
+					0, NULL);
                         if (regexec_result)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
@@ -1298,6 +1284,58 @@ gtt_unregister_gtt_not_cached(const char *relname)
 #endif
 }
 
+#if PG_VERSION_NUM < 160000
+/*
+ * From src/backend/commands/extension.c
+ */
+Oid
+get_extension_schema(Oid ext_oid)
+{
+	Oid                     result;
+	Relation        rel;
+	SysScanDesc scandesc;
+	HeapTuple       tuple;
+	ScanKeyData entry[1];
+
+#if (PG_VERSION_NUM >= 120000)
+	rel = table_open(ExtensionRelationId, AccessShareLock);
+#else
+	rel = heap_open(ExtensionRelationId, AccessShareLock);
+#endif
+
+	ScanKeyInit(&entry[0],
+#if (PG_VERSION_NUM >= 120000)
+				Anum_pg_extension_oid,
+#else
+				ObjectIdAttributeNumber,
+#endif
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(ext_oid));
+
+	scandesc = systable_beginscan(rel, ExtensionOidIndexId, true,
+								  NULL, 1, entry);
+
+	tuple = systable_getnext(scandesc);
+
+	/* We assume that there can be at most one matching tuple */
+	if (HeapTupleIsValid(tuple))
+		result = ((Form_pg_extension) GETSTRUCT(tuple))->extnamespace;
+	else
+		result = InvalidOid;
+
+	systable_endscan(scandesc);
+
+#if (PG_VERSION_NUM >= 120000)
+	table_close(rel, AccessShareLock);
+#else
+	heap_close(rel, AccessShareLock);
+#endif
+
+	return result;
+}
+#endif
+
+
 /*
  * EnableGttManager
  *              Enables the GTT management cache at backend startup.
@@ -1892,57 +1930,6 @@ gtt_update_registered_table(Gtt gtt)
 		ereport(ERROR, (errmsg("could not disconnect from SPI manager")));
 }
 
-#if PG_VERSION_NUM < 160000
-/*
- * From src/backend/commands/extension.c
- */
-static Oid
-get_extension_schema(Oid ext_oid)
-{
-	Oid                     result;
-	Relation        rel;
-	SysScanDesc scandesc;
-	HeapTuple       tuple;
-	ScanKeyData entry[1];
-
-#if (PG_VERSION_NUM >= 120000)
-	rel = table_open(ExtensionRelationId, AccessShareLock);
-#else
-	rel = heap_open(ExtensionRelationId, AccessShareLock);
-#endif
-
-	ScanKeyInit(&entry[0],
-#if (PG_VERSION_NUM >= 120000)
-				Anum_pg_extension_oid,
-#else
-				ObjectIdAttributeNumber,
-#endif
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(ext_oid));
-
-	scandesc = systable_beginscan(rel, ExtensionOidIndexId, true,
-								  NULL, 1, entry);
-
-	tuple = systable_getnext(scandesc);
-
-	/* We assume that there can be at most one matching tuple */
-	if (HeapTupleIsValid(tuple))
-		result = ((Form_pg_extension) GETSTRUCT(tuple))->extnamespace;
-	else
-		result = InvalidOid;
-
-	systable_endscan(scandesc);
-
-#if (PG_VERSION_NUM >= 120000)
-	table_close(rel, AccessShareLock);
-#else
-	heap_close(rel, AccessShareLock);
-#endif
-
-	return result;
-}
-#endif
-
 /*
  * Create the temporary table related to a Global Temporary Table
  * and register the GTT in pg_global_temp_tables table.
@@ -2070,123 +2057,4 @@ strremovestr(char *src, char *toremove)
 	}
 	return 0;
 }
-
-/****************************************************************
- * Functions definition copied from src/backend/utils/adt/regexp.c
- */
-
-/*
- * Compile regex string into struct at *regex.
- * NB: pg_regfree must be applied to regex if this completes successfully.
- */
-static void
-RE_compile(regex_t *regex, text *text_re, int cflags, Oid collation)
-{
-	int         text_re_len = VARSIZE_ANY_EXHDR(text_re);
-	char       *text_re_val = VARDATA_ANY(text_re);
-	pg_wchar   *pattern;
-	int         pattern_len;
-	int         regcomp_result;
-	char        errMsg[100];
-
-	/* Convert pattern string to wide characters */
-	pattern = (pg_wchar *) palloc((text_re_len + 1) * sizeof(pg_wchar));
-	pattern_len = pg_mb2wchar_with_len(text_re_val,
-									   pattern,
-									   text_re_len);
-
-	/* Compile regex */
-	regcomp_result = pg_regcomp(regex,
-								pattern,
-								pattern_len,
-								cflags,
-								collation);
-
-	pfree(pattern);
-
-	if (regcomp_result != REG_OKAY)
-	{
-		/* re didn't compile (no need for pg_regfree, if so) */
-		pg_regerror(regcomp_result, regex, errMsg, sizeof(errMsg));
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
-				 errmsg("invalid regular expression: %s", errMsg)));
-	}
-}
-
-/*
- * RE_wchar_execute - execute a RE on pg_wchar data
- *
- * Returns true on match, false on no match
- *
- *      re --- the compiled pattern as returned by RE_compile_and_cache
- *      data --- the data to match against (need not be null-terminated)
- *      data_len --- the length of the data string
- *      start_search -- the offset in the data to start searching
- *      nmatch, pmatch  --- optional return area for match details
- *
- * Data is given as array of pg_wchar which is what Spencer's regex package
- * wants.
- */
-static bool
-RE_wchar_execute(regex_t *re, pg_wchar *data, int data_len,
-                                 int start_search, int nmatch, regmatch_t *pmatch)
-{
-	int             regexec_result;
-	char            errMsg[100];
-
-	/* Perform RE match and return result */
-	regexec_result = pg_regexec(re,
-								data,
-								data_len,
-								start_search,
-								NULL,   /* no details */
-								nmatch,
-								pmatch,
-								0);
-
-	if (regexec_result != REG_OKAY && regexec_result != REG_NOMATCH)
-	{
-		/* re failed??? */
-		pg_regerror(regexec_result, re, errMsg, sizeof(errMsg));
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
-				 errmsg("regular expression failed: %s", errMsg)));
-	}
-
-	return (regexec_result == REG_OKAY);
-}
-
-/*
- * RE_execute - execute a RE
- *
- * Returns true on match, false on no match
- *
- *      re --- the compiled pattern as returned by RE_compile_and_cache
- *      dat --- the data to match against (need not be null-terminated)
- *      dat_len --- the length of the data string
- *      nmatch, pmatch  --- optional return area for match details
- *
- * Data is given in the database encoding.  We internally
- * convert to array of pg_wchar which is what Spencer's regex package wants.
- */
-static bool
-RE_execute(regex_t *re, char *dat, int dat_len,
-                   int nmatch, regmatch_t *pmatch)
-{
-	pg_wchar   *data;
-	int                     data_len;
-	bool            match;
-
-	/* Convert data string to wide characters */
-	data = (pg_wchar *) palloc((dat_len + 1) * sizeof(pg_wchar));
-	data_len = pg_mb2wchar_with_len(dat, data, dat_len);
-
-	/* Perform RE match and return result */
-	match = RE_wchar_execute(re, data, data_len, 0, nmatch, pmatch);
-
-	pfree(data);
-	return match;
-}
-
 
