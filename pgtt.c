@@ -257,23 +257,6 @@ _PG_init(void)
 				 errhint("Use \"LOAD 'pgtt';\" in the running session instead.")));
 	}
 
-	/*
- 	 * Define (or redefine) custom GUC variables.
-	 * No custom GUC variable at this time
-	 */
-	DefineCustomBoolVariable("pgtt.enabled",
-							"Enable use of Global Temporary Table",
-							"By default the extension is automatically enabled after load, "
-							"it can be temporary disable by setting the GUC value to false "
-							"then enable again later wnen necessary.",
-							&pgtt_is_enabled,
-							true,
-							PGC_USERSET,
-							0,
-							NULL,
-							NULL,
-							NULL);
-
 	if (GttHashTable == NULL)
 	{
 		/* Initialize list of Global Temporary Table */
@@ -291,6 +274,23 @@ _PG_init(void)
 	 * "template" tables will be found.
 	 */
 	force_pgtt_namespace();
+
+	/*
+	 * Define (or redefine) custom GUC variables.
+	 * No custom GUC variable at this time
+	 */
+	DefineCustomBoolVariable("pgtt.enabled",
+							"Enable use of Global Temporary Table",
+							"By default the extension is automatically enabled after load, "
+							"it can be temporary disable by setting the GUC value to false "
+							"then enable again later wnen necessary.",
+							&pgtt_is_enabled,
+							true,
+							PGC_USERSET,
+							0,
+							NULL,
+							NULL,
+							NULL);
 
 	/*
 	 * Install hooks.
