@@ -1,3 +1,14 @@
+Version 3.1 - Dec 26 2023
+
+This is a maintenance release to fix issues reported by users since latest
+release.
+
+  - Fix ERROR:  attempt to redefine parameter "pgtt.enabled". Thanks to
+    Japin Li for the report.
+  - Forget acquiring lock for temporary table. Thanks to Japin Li for the patch.
+  - Add temporisation after vacuum in 08_plplgsql test.
+  - Update main.yml to remove PG versions prior 12.
+
 Version 3.0 - Sep 17 2023
 
 This major release fix several issues related to PostgreSQL v16 port
