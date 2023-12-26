@@ -236,7 +236,18 @@ static void gtt_unregister_gtt_not_cached(const char *relname);
 void
 _PG_init(void)
 {
-	elog(DEBUG1, "_PG_init()");
+	static bool inited = false;
+
+	elog(DEBUG1, "_PG_init() : %d", inited);
+
+	/*
+	 * Be sure we do initialization only once.
+	 *
+	 * If initialization fails due to, e.g., ERROR:  extension "pgtt" does
+	 * not exist, then we'll return here on the next usage.
+	 */
+	if (inited)
+		return;
 
 	if (ParallelWorkerNumber >= 0)
 		return;
@@ -273,6 +284,8 @@ _PG_init(void)
 							NULL,
 							NULL,
 							NULL);
+
+	inited = true;
 
 	if (GttHashTable == NULL)
 	{
