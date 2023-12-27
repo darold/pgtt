@@ -268,6 +268,24 @@ _PG_init(void)
 				 errhint("Use \"LOAD 'pgtt';\" in the running session instead.")));
 	}
 
+	if (GttHashTable == NULL)
+	{
+		/* Initialize list of Global Temporary Table */
+		EnableGttManager();
+
+		/*
+		 * Load temporary table definition from pg_global_temp_tables table
+		 * into our Hash table and pre-create the temporary tables.
+		 */
+		gtt_load_global_temporary_tables();
+	}
+
+	/*
+	 * Be sure that extension schema is at end of the search path so that
+	 * "template" tables will be found.
+	 */
+	force_pgtt_namespace();
+
 	/*
  	 * Define (or redefine) custom GUC variables.
 	 * No custom GUC variable at this time
@@ -286,24 +304,6 @@ _PG_init(void)
 							NULL);
 
 	inited = true;
-
-	if (GttHashTable == NULL)
-	{
-		/* Initialize list of Global Temporary Table */
-		EnableGttManager();
-
-		/*
-		 * Load temporary table definition from pg_global_temp_tables table
-		 * into our Hash table and pre-create the temporary tables.
-		 */
-		gtt_load_global_temporary_tables();
-	}
-
-	/*
-	 * Be sure that extension schema is at end of the search path so that
-	 * "template" tables will be found.
-	 */
-	force_pgtt_namespace();
 
 	/*
 	 * Install hooks.
