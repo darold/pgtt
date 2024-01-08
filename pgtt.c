@@ -1812,9 +1812,12 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query)
 											rte->perminfoindex - 1);
 					rteperm->relid = gtt.temp_relid;
 #endif
-					rte->relid = gtt.temp_relid;
 					if (rte->rellockmode != AccessShareLock)
-						LockRelationOid(rte->relid, rte->rellockmode);
+					{
+						LockRelationOid(gtt.temp_relid, rte->rellockmode);
+						UnlockRelationOid(rte->relid, rte->rellockmode);
+					}
+					rte->relid = gtt.temp_relid;
 					elog(DEBUG1, "rerouting relid %d access to %d for GTT table \"%s\"", rte->relid, gtt.temp_relid, name);
 				}
 			}
