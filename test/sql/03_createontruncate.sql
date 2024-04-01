@@ -57,3 +57,16 @@ LOAD 'pgtt';
 -- Cleanup
 DROP TABLE t_glob_temptable1;
 
+\c - -
+LOAD 'pgtt';
+
+-- Create a GTT like table
+CREATE /*GLOBAL*/ TEMPORARY TABLE test_gtt (id int, lbl text);
+
+explain verbose SELECT * FROM pgtt_schema.test_gtt;  
+explain verbose SELECT * FROM pgtt_schema.test_gtt;  -- success
+
+\c - -
+LOAD 'pgtt';
+-- Cleanup
+DROP TABLE test_gtt;

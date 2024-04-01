@@ -78,3 +78,25 @@ SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespa
 LOAD 'pgtt';
 -- Cleanup
 DROP TABLE t_glob_temptable1;
+\c - -
+LOAD 'pgtt';
+-- Create a GTT like table
+CREATE /*GLOBAL*/ TEMPORARY TABLE test_gtt (id int, lbl text);
+explain verbose SELECT * FROM pgtt_schema.test_gtt;  
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
+ Seq Scan on pg_temp_3.test_gtt  (cost=0.00..22.70 rows=1270 width=36)
+   Output: id, lbl
+(2 rows)
+
+explain verbose SELECT * FROM pgtt_schema.test_gtt;  -- success
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
+ Seq Scan on pg_temp_3.test_gtt  (cost=0.00..22.70 rows=1270 width=36)
+   Output: id, lbl
+(2 rows)
+
+\c - -
+LOAD 'pgtt';
+-- Cleanup
+DROP TABLE test_gtt;

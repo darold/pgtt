@@ -1817,6 +1817,9 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query)
 						LockRelationOid(gtt.temp_relid, rte->rellockmode);
 						UnlockRelationOid(rte->relid, rte->rellockmode);
 					}
+					else 
+						LockRelationOid(gtt.temp_relid, AccessShareLock);
+					
 					rte->relid = gtt.temp_relid;
 					elog(DEBUG1, "rerouting relid %d access to %d for GTT table \"%s\"", rte->relid, gtt.temp_relid, name);
 				}
