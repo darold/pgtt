@@ -57,3 +57,18 @@ LOAD 'pgtt';
 -- Cleanup
 DROP TABLE t_glob_temptable1;
 
+-- Reconnect to test locking, see #41
+\c - -
+LOAD 'pgtt';
+
+-- Create a GTT like table
+CREATE /*GLOBAL*/ TEMPORARY TABLE test_gtt (id int, lbl text);
+
+EXPLAIN (VERBOSE, COSTS off) SELECT * FROM pgtt_schema.test_gtt;  
+EXPLAIN (VERBOSE, COSTS off) SELECT * FROM pgtt_schema.test_gtt;  -- success
+
+\c - -
+LOAD 'pgtt';
+-- Cleanup
+DROP TABLE test_gtt;
+
