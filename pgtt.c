@@ -2002,7 +2002,13 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 		char namespaceName[NAMEDATALEN];
 
 		/* Get current temporary namespace name */
-		snprintf(namespaceName, sizeof(namespaceName), "pg_temp_%d", MyBackendId);
+		snprintf(namespaceName, sizeof(namespaceName), "pg_temp_%d",
+#if PG_VERSION_NUM < 170000
+				MyBackendId
+#else
+				MyProcNumber
+#endif
+				);
 		
 		newQueryString = psprintf("CREATE TEMPORARY TABLE %s %s WITH DATA",
 				quote_identifier(gtt.relname),
