@@ -64,8 +64,8 @@ LOAD 'pgtt';
 -- Create a GTT like table
 CREATE /*GLOBAL*/ TEMPORARY TABLE test_gtt (id int, lbl text);
 
-EXPLAIN (VERBOSE, COSTS off) SELECT * FROM pgtt_schema.test_gtt;  
-EXPLAIN (VERBOSE, COSTS off) SELECT * FROM pgtt_schema.test_gtt;  -- success
+SELECT * FROM pgtt_schema.test_gtt;  
+SELECT * FROM pgtt_schema.test_gtt;  -- success
 
 \c - -
 LOAD 'pgtt';

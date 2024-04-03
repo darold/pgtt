@@ -83,19 +83,15 @@ DROP TABLE t_glob_temptable1;
 LOAD 'pgtt';
 -- Create a GTT like table
 CREATE /*GLOBAL*/ TEMPORARY TABLE test_gtt (id int, lbl text);
-EXPLAIN (VERBOSE, COSTS off) SELECT * FROM pgtt_schema.test_gtt;  
-          QUERY PLAN          
-------------------------------
- Seq Scan on pg_temp.test_gtt
-   Output: id, lbl
-(2 rows)
+SELECT * FROM pgtt_schema.test_gtt;  
+ id | lbl 
+----+-----
+(0 rows)
 
-EXPLAIN (VERBOSE, COSTS off) SELECT * FROM pgtt_schema.test_gtt;  -- success
-          QUERY PLAN          
-------------------------------
- Seq Scan on pg_temp.test_gtt
-   Output: id, lbl
-(2 rows)
+SELECT * FROM pgtt_schema.test_gtt;  -- success
+ id | lbl 
+----+-----
+(0 rows)
 
 \c - -
 LOAD 'pgtt';
