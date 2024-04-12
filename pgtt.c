@@ -5,7 +5,7 @@
  *
  * Author: Gilles Darold <gilles@darold.net>
  * Licence: PostgreSQL
- * Copyright (c) 2018-2023, Gilles Darold,
+ * Copyright (c) 2018-2024, Gilles Darold,
  *
  *-------------------------------------------------------------------------
  */

@@ -558,4 +558,4 @@ gilles@darold.net
 This extension is free software distributed under the PostgreSQL
 Licence.
 
-        Copyright (c) 2018-2023, Gilles Darold
+        Copyright (c) 2018-2024, Gilles Darold
