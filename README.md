@@ -197,6 +197,9 @@ is always at end of the `search_path`.
 The pgtt schema is automatically added to the search_path when you
 load the extension and if you change the `search_path` later.
 
+You must also give the USAGE privilege on this schema to users that will
+manipulate the global temporary tables.
+
 #### Create a Global Temporary Table
 
 To create a GTT table named "test_table" use the following statement:
