@@ -1,3 +1,15 @@
+Version 3.2 - Apr 12 2024
+
+This is a maintenance release to fix issues reported by users since latest
+release and compatibility with future PG 17.
+
+  - Add information about privilege on the pgtt schema.
+  - Make test on lock compatible with version <= 14
+  - The temporary table needs to be locked. Thanks to Leo X.M. Zeng for the patch.
+  - Replace MyBackendId with MyProcNumber for PG > 16
+  - Check extension when loading pgtt. Thanks to Japin Li for the patch.
+  - Release lock on global template temporary table. Thanks to Japin Li for the patch.
+
 Version 3.1 - Dec 26 2023
 
 This is a maintenance release to fix issues reported by users since latest
