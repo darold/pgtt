@@ -156,17 +156,17 @@ char pgtt_namespace_name[NAMEDATALEN];
 /* In memory storage of GTT and state */
 typedef struct Gtt
 {
-        Oid           relid;
-        Oid           temp_relid;
-        char          relname[NAMEDATALEN];
+	Oid           relid;
+	Oid           temp_relid;
+	char          relname[NAMEDATALEN];
 	bool          preserved;
 	bool          created;
-        char          *code;
+	char          *code;
 } Gtt;
 
 typedef struct relhashent
 {
-        char          name[NAMEDATALEN];
+	char          name[NAMEDATALEN];
 	Gtt           gtt;
 } GttHashEnt;
 
@@ -340,7 +340,7 @@ _PG_fini(void)
 void
 exitHook(int code, Datum arg)
 {
-        elog(DEBUG1, "exiting with %d", code);
+	elog(DEBUG1, "exiting with %d", code);
 }
 
 static void
@@ -498,7 +498,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			if (stmt->into->rel->relpersistence != RELPERSISTENCE_TEMP)
 				break;
 
-			/* 
+			/*
 			 * We only take care here of statements with the GLOBAL keyword
 			 * even if it is deprecated and generate a warning.
 			 */
@@ -510,7 +510,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 					DEFAULT_COLLATION_OID,
 					0, NULL);
 
-			
+
 			if (!regexec_result)
 				break;
 
@@ -521,7 +521,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			if (stmt->into->onCommit == ONCOMMIT_DELETE_ROWS)
 				preserved = false;
 
-			/* 
+			/*
 			 * Case of ON COMMIT DROP and GLOBAL TEMPORARY might not be
 			 * allowed, this is the same as using a normal temporary table
 			 * inside a transaction. Here the table should be dropped after
@@ -565,7 +565,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 					&& (queryString[i+2] == 'S' || queryString[i+2] == 's')
 					&& (isspace(queryString[i+3]) || queryString[i+3] == '(') )
 					break;
-			} 
+			}
 			if (i == strlen(queryString) - 1)
 				elog(ERROR, "can not find AS keyword in this CREATE TABLE AS statement.");
 
@@ -602,7 +602,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			if (stmt->relation->relpersistence != RELPERSISTENCE_TEMP)
 				break;
 
-			/* 
+			/*
 			 * We only take care here of statements with the GLOBAL keyword
 			 * even if it is deprecated and generate a warning.
 			 */
@@ -614,8 +614,8 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 					DEFAULT_COLLATION_OID,
 					0, NULL);
 
-                        if (!regexec_result)
-                                break;
+			if (!regexec_result)
+				break;
 
 			/* Check if there is foreign key defined in the statement */
 			regexec_result = RE_compile_and_execute(
@@ -625,7 +625,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 					REG_ADVANCED | REG_ICASE | REG_NEWLINE,
 					DEFAULT_COLLATION_OID,
 					0, NULL);
-                        if (regexec_result)
+			if (regexec_result)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 						 errmsg("attempt to create referential integrity constraint on global temporary table")));
@@ -648,7 +648,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			if (stmt->oncommit == ONCOMMIT_DELETE_ROWS)
 				preserved = false;
 
-			/* 
+			/*
 			 * Case of ON COMMIT DROP and GLOBAL TEMPORARY might not be
 			 * allowed, this is the same as using a normal temporary table
 			 * inside a transaction. Here the table should be dropped after
@@ -696,7 +696,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			{
 				gtt.code = palloc0(sizeof(char *) * (len + 1));
 				strncpy(gtt.code, queryString+start, len);
-				gtt.code[len] = '\0'; 
+				gtt.code[len] = '\0';
 			}
 
 			elog(DEBUG1, "code for Global Temporary Table \"%s\" creation is \"%s\"", gtt.relname, gtt.code);
@@ -842,8 +842,8 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 					}
 				}
 			}
-                        break;
-                }
+			break;
+		}
 
 		case T_RenameStmt:
 		{
@@ -1157,26 +1157,26 @@ gtt_create_table_statement(Gtt gtt)
 			quote_identifier(pgtt_namespace_name),
 			quote_identifier(gtt.relname),
 			gtt.code);
-        result = SPI_exec(newQueryString, 0);
-        if (result < 0)
-                ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
+	result = SPI_exec(newQueryString, 0);
+	if (result < 0)
+		ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 	/* Get Oid of the newly created table */
 	newQueryString = psprintf("SELECT c.relfilenode FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE c.relname='%s' AND n.nspname = '%s'",
 			gtt.relname,
 			pgtt_namespace_name);
 
-        result = SPI_exec(newQueryString, 0);
-        if (result != SPI_OK_SELECT && SPI_processed != 1)
-                ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
+	result = SPI_exec(newQueryString, 0);
+	if (result != SPI_OK_SELECT && SPI_processed != 1)
+		ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 	oidDatum = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isnull);
 
 	if (!isnull)
 		gttOid = DatumGetInt32(oidDatum);
-        
+
 	if (isnull || !OidIsValid(gttOid))
-                ereport(ERROR,
+		ereport(ERROR,
 				(errmsg("can not get OID of newly created GTT template table %s",
 							quote_identifier(gtt.relname))));
 
@@ -1189,17 +1189,17 @@ gtt_create_table_statement(Gtt gtt)
 			(gtt.preserved) ? 't' : 'f',
 			quote_literal_cstr(gtt.code)
 		);
-        result = SPI_exec(newQueryString, 0);
-        if (result < 0)
-                ereport(ERROR, (errmsg("can not registrer new global temporary table")));
+	result = SPI_exec(newQueryString, 0);
+	if (result < 0)
+		ereport(ERROR, (errmsg("can not registrer new global temporary table")));
 
 	/* Set privilege on the unlogged table */
 	newQueryString = psprintf("GRANT ALL ON TABLE %s.%s TO public",
 			quote_identifier(pgtt_namespace_name),
 			quote_identifier(gtt.relname));
-        result = SPI_exec(newQueryString, 0);
-        if (result < 0)
-                ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
+	result = SPI_exec(newQueryString, 0);
+	if (result < 0)
+		ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 
 	/* Mark the GTT as been created before register the table in the cache */
@@ -1383,7 +1383,7 @@ EnableGttManager(void)
 	/* Set the OID and name of the extension schema, all objects will be created in this schema */
 	pgtt_namespace_oid = get_extension_schema(extOid);
 	if (!OidIsValid(pgtt_namespace_oid))
-		elog(ERROR, "namespace %d can not be found.", pgtt_namespace_oid); 
+		elog(ERROR, "namespace %d can not be found.", pgtt_namespace_oid);
 	strcpy(pgtt_namespace_name, get_namespace_name(pgtt_namespace_oid));
 }
 
@@ -1394,15 +1394,15 @@ EnableGttManager(void)
 void
 GttHashTableDeleteAll(void)
 {
-        HASH_SEQ_STATUS status;
-        GttHashEnt *lentry = NULL;
+	HASH_SEQ_STATUS status;
+	GttHashEnt *lentry = NULL;
 
-        if (GttHashTable == NULL)
-                return;
+	if (GttHashTable == NULL)
+		return;
 
-        hash_seq_init(&status, GttHashTable);
-        while ((lentry = (GttHashEnt *) hash_seq_search(&status)) != NULL)
-        {
+	hash_seq_init(&status, GttHashTable);
+	while ((lentry = (GttHashEnt *) hash_seq_search(&status)) != NULL)
+	{
 		Gtt          gtt = GetGttByName(lentry->name);
 
 		elog(DEBUG1, "Remove GTT %s from our hash table", gtt.relname);
@@ -1420,12 +1420,12 @@ GttHashTableDeleteAll(void)
 Gtt
 GetGttByName(const char *name)
 {
-        Gtt          gtt;
+	Gtt          gtt;
 
-        if (PointerIsValid(name))
-                GttHashTableLookup(name, gtt);
+	if (PointerIsValid(name))
+		GttHashTableLookup(name, gtt);
 
-        return gtt;
+	return gtt;
 }
 
 /*
@@ -1458,15 +1458,15 @@ gtt_load_global_temporary_tables(void)
 	//snapshot = GetTransactionSnapshot();
 #if (PG_VERSION_NUM >= 120000)
 	rel = table_openrv(rv, AccessShareLock);
-        scan = table_beginscan(rel, snapshot, 0, (ScanKey) NULL);
+	scan = table_beginscan(rel, snapshot, 0, (ScanKey) NULL);
 #else
 	rel = heap_openrv(rv, AccessShareLock);
-        scan = heap_beginscan(rel, snapshot, 0, (ScanKey) NULL);
+	scan = heap_beginscan(rel, snapshot, 0, (ScanKey) NULL);
 #endif
 	tupleDesc = RelationGetDescr(rel);
 	numberOfAttributes = tupleDesc->natts;
-        while (HeapTupleIsValid(tuple = heap_getnext(scan, ForwardScanDirection)))
-        {
+	while (HeapTupleIsValid(tuple = heap_getnext(scan, ForwardScanDirection)))
+		{
 		Gtt gtt;
 		Datum *values = (Datum *) palloc(numberOfAttributes * sizeof(Datum));
 		bool *isnull = (bool *) palloc(numberOfAttributes * sizeof(bool));
@@ -1497,41 +1497,41 @@ static Oid
 create_temporary_table_internal(Oid parent_relid, bool preserved)
 {
 	/* Value to be returned */
-        Oid                         temp_relid = InvalidOid; /* safety */
+	Oid                         temp_relid = InvalidOid; /* safety */
 #if (PG_VERSION_NUM >= 130000)
 	ObjectAddress               address;
 #endif
 
-        /* Parent's namespace and name */
-        Oid                         parent_nsp;
-        char                       *parent_name,
-                                   *parent_nsp_name;
-        char                        parent_persistence;
+	/* Parent's namespace and name */
+	Oid                         parent_nsp;
+	char                       *parent_name,
+							   *parent_nsp_name;
+	char                        parent_persistence;
 
-        /* Elements of the "CREATE TABLE" query tree */
-        RangeVar                   *parent_rv;
-        RangeVar                   *table_rv;
-        TableLikeClause            *like_clause = makeNode(TableLikeClause);
-        CreateStmt                 *createStmt = makeNode(CreateStmt);
-        List                       *createStmts;
-        ListCell                   *lc;
+	/* Elements of the "CREATE TABLE" query tree */
+	RangeVar                   *parent_rv;
+	RangeVar                   *table_rv;
+	TableLikeClause            *like_clause = makeNode(TableLikeClause);
+	CreateStmt                 *createStmt = makeNode(CreateStmt);
+	List                       *createStmts;
+	ListCell                   *lc;
 
 	elog(DEBUG1, "creating a temporary table like table with Oid %d", parent_relid);
 
-        /* Lock parent and check if it exists */
-        LockRelationOid(parent_relid, ShareUpdateExclusiveLock);
-        if (!SearchSysCacheExists1(RELOID, ObjectIdGetDatum(parent_relid)))
-                elog(ERROR, "relation %u does not exist", parent_relid);
+	/* Lock parent and check if it exists */
+	LockRelationOid(parent_relid, ShareUpdateExclusiveLock);
+	if (!SearchSysCacheExists1(RELOID, ObjectIdGetDatum(parent_relid)))
+		elog(ERROR, "relation %u does not exist", parent_relid);
 
-        /* Cache parent's namespace and name */
-        parent_name = get_rel_name(parent_relid);
-        parent_nsp = get_rel_namespace(parent_relid);
-        parent_nsp_name = get_namespace_name(parent_nsp);
-        parent_persistence = get_rel_persistence(parent_relid);
+	/* Cache parent's namespace and name */
+	parent_name = get_rel_name(parent_relid);
+	parent_nsp = get_rel_namespace(parent_relid);
+	parent_nsp_name = get_namespace_name(parent_nsp);
+	parent_persistence = get_rel_persistence(parent_relid);
 
-        /* Make up parent's RangeVar */
-        parent_rv = makeRangeVar(parent_nsp_name, parent_name, -1);
-        parent_rv->relpersistence = parent_persistence;
+	/* Make up parent's RangeVar */
+	parent_rv = makeRangeVar(parent_nsp_name, parent_name, -1);
+	parent_rv->relpersistence = parent_persistence;
 
 	elog(DEBUG1, "Parent namespace: %s, parent relname: %s, parent oid: %d",
 									parent_rv->schemaname,
@@ -1540,12 +1540,12 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 
 	/* Set name of temporary table same as parent table */
 	table_rv = makeRangeVar("pg_temp", parent_rv->relname, -1);
-        Assert(table_rv);
+	Assert(table_rv);
 
 	elog(DEBUG1, "Initialize TableLikeClause structure");
-        /* Initialize TableLikeClause structure */
-        like_clause->relation            = copyObject(parent_rv);
-        like_clause->options             = CREATE_TABLE_LIKE_DEFAULTS
+	/* Initialize TableLikeClause structure */
+	like_clause->relation            = copyObject(parent_rv);
+	like_clause->options             = CREATE_TABLE_LIKE_DEFAULTS
 						| CREATE_TABLE_LIKE_INDEXES
 						| CREATE_TABLE_LIKE_CONSTRAINTS
 #if (PG_VERSION_NUM >= 100000)
@@ -1557,45 +1557,45 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 						| CREATE_TABLE_LIKE_COMMENTS;
 
 	elog(DEBUG1, "Initialize CreateStmt structure");
-        /* Initialize CreateStmt structure */
-        createStmt->relation            = copyObject(table_rv);
+	/* Initialize CreateStmt structure */
+	createStmt->relation            = copyObject(table_rv);
 	createStmt->relation->schemaname = NULL;
 	createStmt->relation->relpersistence = RELPERSISTENCE_TEMP;
-        createStmt->tableElts           = list_make1(copyObject(like_clause));
-        createStmt->inhRelations        = NIL;
-        createStmt->ofTypename          = NULL;
-        createStmt->constraints         = NIL;
-        createStmt->options             = NIL;
+	createStmt->tableElts           = list_make1(copyObject(like_clause));
+	createStmt->inhRelations        = NIL;
+	createStmt->ofTypename          = NULL;
+	createStmt->constraints         = NIL;
+	createStmt->options             = NIL;
 #if (PG_VERSION_NUM >= 120000)
-        createStmt->accessMethod        = NULL;
+	createStmt->accessMethod        = NULL;
 #endif
 	if (preserved)
 		createStmt->oncommit    = ONCOMMIT_PRESERVE_ROWS;
 	else
 		createStmt->oncommit    = ONCOMMIT_DELETE_ROWS;
-        createStmt->tablespacename      = NULL;
-        createStmt->if_not_exists       = false;
+	createStmt->tablespacename      = NULL;
+	createStmt->if_not_exists       = false;
 
 	elog(DEBUG1, "Obtain the sequence of Stmts to create temporary table");
-        /* Obtain the sequence of Stmts to create temporary table */
-        createStmts = transformCreateStmt(createStmt, NULL);
+	/* Obtain the sequence of Stmts to create temporary table */
+	createStmts = transformCreateStmt(createStmt, NULL);
 
 	elog(DEBUG1, "Processing list of statements");
-        /* Create the temporary table */
-        foreach (lc, createStmts)
-        {
-                /* Fetch current CreateStmt */
-                Node *cur_stmt = (Node *) lfirst(lc);
+	/* Create the temporary table */
+	foreach (lc, createStmts)
+	{
+		/* Fetch current CreateStmt */
+		Node *cur_stmt = (Node *) lfirst(lc);
 
 		elog(DEBUG1, "Processing statement of type %d", nodeTag(cur_stmt));
-                if (IsA(cur_stmt, CreateStmt))
-                {
+		if (IsA(cur_stmt, CreateStmt))
+		{
 			Datum           toast_options;
 			static char     *validnsps[] = HEAP_RELOPT_NAMESPACES;
-                        Oid             temp_relowner;
+			Oid             temp_relowner;
 
-                        /* Temporary table owner must be current user */
-                        temp_relowner = GetUserId();
+			/* Temporary table owner must be current user */
+			temp_relowner = GetUserId();
 
 			elog(DEBUG1, "Creating a temporary table and get its Oid");
                         /* Create a temporary table and save its Oid */
@@ -1681,12 +1681,12 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 			 * Recurse for anything else.
 			 */
 #if PG_VERSION_NUM >= 100000
-                        PlannedStmt *stmt = makeNode(PlannedStmt);
-                        stmt->commandType       = CMD_UTILITY;
-                        stmt->canSetTag         = true;
-                        stmt->utilityStmt       = cur_stmt;
-                        stmt->stmt_location     = -1;
-                        stmt->stmt_len          = 0;
+			PlannedStmt *stmt = makeNode(PlannedStmt);
+			stmt->commandType       = CMD_UTILITY;
+			stmt->canSetTag         = true;
+			stmt->utilityStmt       = cur_stmt;
+			stmt->stmt_location     = -1;
+			stmt->stmt_len          = 0;
 			ProcessUtility(stmt,
 								 "PGTT provide a query string",
 #if PG_VERSION_NUM >= 140000
@@ -1719,10 +1719,10 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
         }
 
 	/* release lock on "template" relation */
-        UnlockRelationOid(parent_relid, ShareUpdateExclusiveLock);
+	UnlockRelationOid(parent_relid, ShareUpdateExclusiveLock);
 
 	elog(DEBUG1, "Create a temporary table done with Oid: %d", temp_relid);
-        return temp_relid;
+	return temp_relid;
 }
 
 /*
@@ -1827,7 +1827,7 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query)
 	}
 
 	/* restore hook */
-        if (prev_post_parse_analyze_hook) {
+	if (prev_post_parse_analyze_hook) {
 #if PG_VERSION_NUM >= 140000
 		prev_post_parse_analyze_hook(pstate, query, jstate);
 #else
@@ -1847,9 +1847,9 @@ is_catalog_relid(Oid relid)
 	if (!HeapTupleIsValid(reltup))
 		elog(ERROR, "cache lookup failed for relation %u", relid);
 	relform = (Form_pg_class) GETSTRUCT(reltup);
-        relnamespace = relform->relnamespace;
+	relnamespace = relform->relnamespace;
 	ReleaseSysCache(reltup);
-        if (relnamespace == PG_CATALOG_NAMESPACE || relnamespace == PG_TOAST_NAMESPACE)
+	if (relnamespace == PG_CATALOG_NAMESPACE || relnamespace == PG_TOAST_NAMESPACE)
 	{
 		elog(DEBUG1, "relation %d is in pg_catalog or pg_toast schema, nothing to do.", relid);
 		return true;
@@ -1900,18 +1900,18 @@ force_pgtt_namespace (void)
 		 * Override the search_path by adding our pgtt schema
 		 */
 		(void) set_config_option("search_path",
-                                                                         search_path.data,
-                                                                         (superuser() ? PGC_SUSET : PGC_USERSET),
-                                                                         PGC_S_SESSION,
-                                                                         GUC_ACTION_SET, true, 0,
-									 false
-									 );
+								 search_path.data,
+								 (superuser() ? PGC_SUSET : PGC_USERSET),
+								 PGC_S_SESSION,
+								 GUC_ACTION_SET, true, 0,
+								 false
+								 );
 	}
 	elog(DEBUG1, "search_path forced to %s.", search_path.data);
 }
 
 /*
- * Update a registered Global Temporary Table 
+ * Update a registered Global Temporary Table
  * in the pg_global_temp_tables table.
  *
  */
@@ -1934,9 +1934,11 @@ gtt_update_registered_table(Gtt gtt)
 			gtt.relname,
 			gtt.relid
 		);
-        result = SPI_exec(newQueryString, 0);
-        if (result < 0)
-                ereport(ERROR, (errmsg("can not update relid %d into %s.pg_global_temp_tables", gtt.relid, quote_identifier(pgtt_namespace_name))));
+	result = SPI_exec(newQueryString, 0);
+	if (result < 0)
+		ereport(ERROR,
+				(errmsg("can not update relid %d into %s.pg_global_temp_tables",
+						gtt.relid, quote_identifier(pgtt_namespace_name))));
 
 	finished = SPI_finish();
 	if (finished != SPI_OK_FINISH)
@@ -1970,18 +1972,18 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 			quote_identifier(pgtt_namespace_name),
 			quote_identifier(gtt.relname),
 			gtt.code);
-        result = SPI_exec(newQueryString, 0);
-        if (result < 0)
-                ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
+	result = SPI_exec(newQueryString, 0);
+	if (result < 0)
+		ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 	/* Get Oid of the newly created table */
 	newQueryString = psprintf("SELECT c.relfilenode FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE c.relname='%s' AND n.nspname = '%s'",
 			gtt.relname,
 			pgtt_namespace_name);
 
-        result = SPI_exec(newQueryString, 0);
-        if (result != SPI_OK_SELECT && SPI_processed != 1)
-                ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
+	result = SPI_exec(newQueryString, 0);
+	if (result != SPI_OK_SELECT && SPI_processed != 1)
+		ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 	oidDatum = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isnull);
 
@@ -1989,7 +1991,7 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 		gttOid = DatumGetInt32(oidDatum);
 
 	if (isnull || !OidIsValid(gttOid))
-                ereport(ERROR,
+		ereport(ERROR,
 				(errmsg("can not get OID of newly created GTT template table %s",
 							quote_identifier(gtt.relname))));
 
@@ -2008,7 +2010,7 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 				MyProcNumber
 #endif
 				);
-		
+
 		newQueryString = psprintf("CREATE TEMPORARY TABLE %s %s WITH DATA",
 				quote_identifier(gtt.relname),
 				gtt.code);
@@ -2029,7 +2031,7 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 
 		if (!isnull)
 			gtt.temp_relid = DatumGetInt32(oidDatum);
-		
+
 		if (isnull || !OidIsValid(gttOid))
 			ereport(ERROR,
 					(errmsg("can not get OID of newly created temporary table %s",
@@ -2046,9 +2048,9 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 			(gtt.preserved) ? 't' : 'f',
 			quote_literal_cstr(gtt.code)
 		);
-        result = SPI_exec(newQueryString, 0);
-        if (result < 0)
-                ereport(ERROR, (errmsg("can not registrer new global temporary table")));
+	result = SPI_exec(newQueryString, 0);
+	if (result < 0)
+		ereport(ERROR, (errmsg("can not registrer new global temporary table")));
 
 	finished = SPI_finish();
 	if (finished != SPI_OK_FINISH)
