@@ -427,44 +427,42 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			 * handle SET search_path TO ... statement. This code also
 			 * add the PGTT schema if not present in the path
 			 */
-			if (strcmp(stmt->name, "search_path") == 0)
+			if (stmt->kind == VAR_SET_VALUE &&
+				strcmp(stmt->name, "search_path") == 0)
 			{
-				if (stmt->kind == VAR_SET_VALUE)
+				ListCell *l;
+				bool     found = false;
+
+				if (stmt->args == NIL)
+					break;
+
+				foreach(l, stmt->args)
 				{
-					ListCell *l;
-					bool     found = false;
+					Node    *arg = (Node *) lfirst(l);
+					A_Const *con = (A_Const *) arg;
+					char    *val;
 
-					if (stmt->args == NIL)
-						break;
+					val = strVal(&con->val);
+					if (strcmp(val,
+						get_namespace_name(pgtt_namespace_oid)) == 0)
+						found = true;
+				}
 
-					foreach(l, stmt->args)
-					{
-						Node    *arg = (Node *) lfirst(l);
-						A_Const *con = (A_Const *) arg;
-						char    *val;
-
-						val = strVal(&con->val);
-						if (strcmp(val,
-							get_namespace_name(pgtt_namespace_oid)) == 0)
-							found = true;
-					}
-					/* append the extension schema to the arg list. */
-					if (!found)
-					{
-						A_Const *newcon = makeNode(A_Const);
-						char *str = (char *) get_namespace_name(pgtt_namespace_oid);
+				/* append the extension schema to the arg list. */
+				if (!found)
+				{
+					A_Const *newcon = makeNode(A_Const);
+					char *str = (char *) get_namespace_name(pgtt_namespace_oid);
 
 #if PG_VERSION_NUM < 150000
-						newcon->val.type = T_String;
-						newcon->val.val.str = pstrdup(str);
+					newcon->val.type = T_String;
+					newcon->val.val.str = pstrdup(str);
 #else
-						newcon->val.node.type = T_String;
-						newcon->val.sval.sval = pstrdup(str);
+					newcon->val.node.type = T_String;
+					newcon->val.sval.sval = pstrdup(str);
 #endif
-						//newcon->type = T_A_Const;
-						newcon->location = strlen(queryString);
-						stmt->args = lappend(stmt->args, newcon);
-					}
+					newcon->location = strlen(queryString);
+					stmt->args = lappend(stmt->args, newcon);
 				}
 			}
 		}
