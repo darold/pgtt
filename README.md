@@ -309,7 +309,12 @@ on global temporary table.
 #### Global Temporary Table usage
 
 When `pgtt.enabled` is true (default) and the extension have been
-loaded (`session_preload_libraries = 'pgtt' or in a session `LOAD 'pgtt';`)
+loaded using any of the three methods:
+
+- `session_preload_libraries = 'pgtt'` in postgresql.conf
+- `ALTER DATABASE mydb SET session_preload_libraries = 'pgtt'`
+- in a session `LOAD 'pgtt';`
+
 the first access to the table using a SELECT, UPDATE or DELETE statement
 will produce the creation of a temporary table using the definition of the
 "template" table created during the call to `CREATE GLOBAL TEMPORARY TABLE`
