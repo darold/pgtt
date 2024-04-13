@@ -20,12 +20,21 @@
 
 -- As superuser
 CREATE ROLE pgtt_user1 LOGIN;
-CREATE EXTENSION pgtt;
+CREATE EXTENSION IF NOT EXISTS pgtt;
+GRANT ALL ON SCHEMA pgtt_schema TO pgtt_user1;
+
+-- Set session_preload_libraries
+DO $$                          
+BEGIN
+    --EXECUTE format('ALTER DATABASE %I SET session_preload_libraries = ''$libdir/plugins/pgtt''', current_database());
+    EXECUTE format('ALTER DATABASE %I SET session_preload_libraries = ''pgtt''', current_database());
+END
+$$;
 
 \c - pgtt_user1
 
 -- Import the library
-LOAD '$libdir/plugins/pgtt';
+-- LOAD '$libdir/plugins/pgtt';
 
 SHOW search_path;
 

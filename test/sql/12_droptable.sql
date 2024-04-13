@@ -6,7 +6,7 @@
 ----
 
 -- Import the library
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 
 -- Create a GTT like table
 CREATE /*GLOBAL*/ TEMPORARY TABLE t_glob_temptable1 (id integer, lbl text) ON COMMIT PRESERVE ROWS;

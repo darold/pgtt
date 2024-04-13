@@ -9,7 +9,7 @@
 ----
 
 -- Import the library
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 
 BEGIN;
 
@@ -64,7 +64,7 @@ SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespa
 
 -- Reconnect and drop it
 \c - -
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 
 -- Cleanup
 DROP TABLE t_glob_temptable1;

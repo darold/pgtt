@@ -8,7 +8,7 @@
 --
 ----
 -- Import the library
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 -- Create a GTT like table
 CREATE /*GLOBAL*/ TEMPORARY TABLE t_glob_temptable1 (id integer, lbl text) ON COMMIT PRESERVE ROWS;
 CREATE INDEX ON pgtt_schema.t_glob_temptable1 (id);
@@ -123,7 +123,7 @@ SELECT * FROM t_glob_temptable2 WHERE id = 2;
 ALTER TABLE t_glob_temptable2 RENAME TO t_glob_temptable1;
 ERROR:  a temporary table has been created and is active, can not rename the GTT table in this session.
 \c - -
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 ALTER TABLE t_glob_temptable2 RENAME TO t_glob_temptable1;
 -- Look if the renaming is effective
 SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE relname = 't_glob_temptable1';
@@ -134,6 +134,6 @@ SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespa
 
 -- Reconnect and drop it
 \c - -
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 -- Cleanup
 DROP TABLE t_glob_temptable1;

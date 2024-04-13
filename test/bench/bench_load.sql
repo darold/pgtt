@@ -3,7 +3,7 @@
 \set tid random(1, 10 * :scale)
 \set delta random(-5000, 5000)
 
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 
 BEGIN;
 UPDATE pgbench_accounts SET abalance = abalance + :delta WHERE aid = :aid;

@@ -3,7 +3,7 @@
 \set tid random(1, 10 * :scale)
 \set delta random(-5000, 5000)
 
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 BEGIN;
 INSERT INTO test_tt (id, lbl) SELECT i, md5(i::text) FROM generate_series(1, 1000) i;
 UPDATE pgbench_accounts SET abalance = abalance + :delta WHERE aid = :aid;

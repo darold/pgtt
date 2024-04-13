@@ -7,7 +7,7 @@
 ----
 
 -- Import the library
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 
 -- Create a GTT like table
 CREATE GLOBAL TEMPORARY TABLE t_glob_temptable1 (id integer, lbl text) ON COMMIT PRESERVE ROWS;
@@ -52,14 +52,14 @@ SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespa
 
 -- Reconnect and drop it
 \c - -
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 
 -- Cleanup
 DROP TABLE t_glob_temptable1;
 
 -- Reconnect to test locking, see #41
 \c - -
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 
 -- Create a GTT like table
 CREATE /*GLOBAL*/ TEMPORARY TABLE test_gtt (id int, lbl text);
@@ -68,7 +68,7 @@ SELECT * FROM pgtt_schema.test_gtt;
 SELECT * FROM pgtt_schema.test_gtt;  -- success
 
 \c - -
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 -- Cleanup
 DROP TABLE test_gtt;
 

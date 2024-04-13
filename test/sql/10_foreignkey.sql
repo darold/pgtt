@@ -5,7 +5,7 @@
 --
 ----
 -- Import the library
-LOAD 'pgtt';
+-- LOAD 'pgtt';
 -- Must throw ERROR: attempt to create referential integrity constraint on temporary table.
 CREATE /*GLOBAL*/ TEMPORARY TABLE t2 (c1 integer, FOREIGN KEY (c1) REFERENCES source (id));
 BEGIN;

@@ -120,28 +120,25 @@ add the library to the $libdir/plugins/ directory.
 	cd $libdir/plugins/
 	sudo ln -s ../pgtt.so
 
-Then it will be possible to use it using `LOAD '$libdir/plugins/pgtt.so';`
+Then it will be possible to use it using `session_preload_libraries = '$libdir/plugins/pgtt'` in postgresql.conf
 To create and manage GTT using a non-superuser role you will have to grant
-the CREATE privilege on the `pgtt_schema` schema to the user.
+the CREATE privilege on the `pgtt_schema` schema to the user. For example:
+
+	GRANT ALL ON SCHEMA pgtt_schema TO pgtt_user1;
 
 To run test execute the following command as superuser:
 
 	make installcheck
 
 An additional standalone test is provided to test the use of the
-extension in a dedicated schema "SESSION". The requisite is to
-remove these two lines from the pgtt.control file:
-
-	schema = 'pgtt_schema'
-	relocatable = false
-
-Then the tests can be executed using:
+extension as non superuser. The test can be executed using:
 
 	mkdir results
-	createdb gtt_relocation
-	psql -d gtt_relocation -f test/relocation.sql > results/relocation.out 2>&1
-	diff results/relocation.out test/expected/relocation.out
-	dropdb gtt_relocation
+	createdb gtt_privilege
+	LANG=C psql -d gtt_privilege -f test/privilege.sql > results/privilege.out 2>&1
+	diff results/privilege.out test/expected/privilege.out
+	dropdb gtt_privilege
+	dropuser pgtt_user1
 
 
 ### [Configuration](#configuration)
@@ -162,14 +159,27 @@ will have to create the extension using:
 
 	CREATE EXTENSION pgtt;
 
-As a superuser you can load the extension using:
+You can load the extension by setting in postgresql.conf :
 
-	LOAD 'pgtt';
+	session_preload_libraries = 'pgtt';
+
+or by setting it at database level as follow:
+
+	DO $$
+	BEGIN
+	    EXECUTE format('ALTER DATABASE %I SET session_preload_libraries = ''pgtt''', current_database());
+	END
+	$$;
+
 
 non-superuser must load the library using the plugins/ directory
 as follow:
 
-	LOAD '$libdir/plugins/pgtt';
+	DO $$
+	BEGIN
+	    EXECUTE format('ALTER DATABASE %I SET session_preload_libraries = ''$libdir/plugins/pgtt''', current_database());
+	END
+	$$;
 
 Take care to follow installation instruction above to create the
 symlink from the plugins/ directory to the extension library file.
@@ -299,10 +309,11 @@ on global temporary table.
 #### Global Temporary Table usage
 
 When `pgtt.enabled` is true (default) and the extension have been
-loaded (`LOAD 'pgtt';`) the first access to the table using a SELECT,
-UPDATE or DELETE statement will produce the creation of a temporary
-table using the definition of the "template" table created during
-the call to `CREATE GLOBAL TEMPORARY TABLE` statement.
+loaded (`session_preload_libraries = 'pgtt' or in a session `LOAD 'pgtt';`)
+the first access to the table using a SELECT, UPDATE or DELETE statement
+will produce the creation of a temporary table using the definition of the
+"template" table created during the call to `CREATE GLOBAL TEMPORARY TABLE`
+statement.
 
 Once the temporary table is created at the first access, the original
 SELECT, UPDATE or DELETE statement is automatically rerouted to the
@@ -550,8 +561,8 @@ not be the case.
 
 ### [Authors](#authors)
 
-Gilles Darold
-gilles@darold.net
+- Gilles Darold
+- Julien Rouhaud
 
 ### [License](#license)
 

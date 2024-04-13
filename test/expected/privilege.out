@@ -1,7 +1,8 @@
 CREATE ROLE
 CREATE EXTENSION
+GRANT
+DO
 You are now connected to database "gtt_privilege" as user "pgtt_user1".
-LOAD
     search_path     
 --------------------
  public,pgtt_schema
