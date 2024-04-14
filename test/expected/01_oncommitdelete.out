@@ -7,8 +7,6 @@
 -- when done in a separate session.
 --
 ----
--- Import the library
--- LOAD 'pgtt';
 -- Create a GTT like table to test ON COMMIT DELETE ROWS
 CREATE GLOBAL TEMPORARY TABLE t_glob_temptable1 (id integer, lbl text) ON COMMIT DELETE ROWS;
 WARNING:  GLOBAL is deprecated in temporary table creation
@@ -95,7 +93,6 @@ DROP TABLE t_glob_temptable1;
 ERROR:  can not drop a GTT that is in use.
 -- Reconnect and drop it
 \c - -
--- LOAD 'pgtt';
 SHOW search_path;
     search_path     
 --------------------

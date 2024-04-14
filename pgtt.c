@@ -249,7 +249,8 @@ _PG_init(void)
 	{
 		ereport(FATAL,
 				(errmsg("The pgtt extension can not be loaded using shared_preload_libraries."),
-				 errhint("Use \"LOAD 'pgtt';\" in the running session instead.")));
+				 errhint("Add 'pgtt' to session_preload_libraries globally, or"
+						 " for the wanted roles or databases instead.")));
 	}
 
 	/*

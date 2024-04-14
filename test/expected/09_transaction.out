@@ -7,8 +7,6 @@
 -- will not preserve it.
 --
 ----
--- Import the library
--- LOAD 'pgtt';
 BEGIN;
 -- Register the Global temporary table in a transaction
 CREATE /*GLOBAL*/ TEMPORARY TABLE t_glob_temptable1 (id integer, lbl text) ON COMMIT PRESERVE ROWS;
@@ -83,6 +81,5 @@ SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespa
 
 -- Reconnect and drop it
 \c - -
--- LOAD 'pgtt';
 -- Cleanup
 DROP TABLE t_glob_temptable1;
