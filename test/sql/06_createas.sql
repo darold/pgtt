@@ -5,9 +5,6 @@
 --
 ----
 
--- Import the library
--- LOAD 'pgtt';
-
 -- Create a GTT like table to test ON COMMIT PRESERVE ROWS
 CREATE GLOBAL TEMPORARY TABLE t_glob_temptable1 AS SELECT * FROM source WITH DATA;
 
@@ -45,8 +42,6 @@ SELECT * FROM t_glob_temptable1 ORDER BY id;
 
 -- Reconnect and drop it
 \c - -
--- LOAD 'pgtt';
 
 -- Cleanup
 DROP TABLE t_glob_temptable1;
-

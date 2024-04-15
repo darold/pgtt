@@ -8,9 +8,6 @@
 --
 ----
 
--- Import the library
--- LOAD 'pgtt';
-
 BEGIN;
 
 -- Register the Global temporary table in a transaction
@@ -64,8 +61,6 @@ SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespa
 
 -- Reconnect and drop it
 \c - -
--- LOAD 'pgtt';
 
 -- Cleanup
 DROP TABLE t_glob_temptable1;
-

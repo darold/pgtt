@@ -6,7 +6,7 @@
 CREATE EXTENSION pgtt;
 
 -- Set session_preload_libraries
-DO $$                          
+DO $$
 BEGIN
     EXECUTE format('ALTER DATABASE %I SET session_preload_libraries = ''pgtt''', current_database());
 END
@@ -18,5 +18,3 @@ COMMENT ON TABLE source IS 'Table used to demonstrate GTT create as feature';
 COMMENT ON COLUMN source.id IS 'auto generated column';
 CREATE INDEX ON source(lbl);
 INSERT INTO source VALUES (1,'one'), (2,'two'),(3,'three');
-
-

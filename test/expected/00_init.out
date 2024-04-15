@@ -4,7 +4,7 @@
 -- Create the PostgreSQL extension
 CREATE EXTENSION pgtt;
 -- Set session_preload_libraries
-DO $$                          
+DO $$
 BEGIN
     EXECUTE format('ALTER DATABASE %I SET session_preload_libraries = ''pgtt''', current_database());
 END

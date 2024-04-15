@@ -6,9 +6,6 @@
 --
 ----
 
--- Import the library
--- LOAD 'pgtt';
-
 -- Create a GTT like table
 CREATE /*GLOBAL*/ TEMPORARY TABLE t_glob_temptable1 (id integer, lbl text) ON COMMIT PRESERVE ROWS;
 
@@ -62,7 +59,6 @@ EXPLAIN (COSTS OFF) SELECT * FROM t_glob_temptable1 WHERE id = 2;
 
 -- Reconnect and drop it
 \c - -
--- LOAD 'pgtt';
 
 -- Cleanup
 DROP TABLE t_glob_temptable1;
@@ -82,6 +78,5 @@ WHERE c.oid = 'pgtt_schema.t_glob_temptable2'::regclass::oid AND c.oid = i.indre
 ORDER BY i.indisprimary DESC, c2.relname;
 
 \c - -
--- LOAD 'pgtt';
 
 DROP TABLE t_glob_temptable2;

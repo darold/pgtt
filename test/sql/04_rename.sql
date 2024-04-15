@@ -8,9 +8,6 @@
 --
 ----
 
--- Import the library
--- LOAD 'pgtt';
-
 -- Create a GTT like table
 CREATE /*GLOBAL*/ TEMPORARY TABLE t_glob_temptable1 (id integer, lbl text) ON COMMIT PRESERVE ROWS;
 
@@ -95,8 +92,6 @@ ALTER TABLE t_glob_temptable2 RENAME TO t_glob_temptable1;
 
 \c - -
 
--- LOAD 'pgtt';
-
 ALTER TABLE t_glob_temptable2 RENAME TO t_glob_temptable1;
 
 -- Look if the renaming is effective
@@ -104,8 +99,5 @@ SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespa
 
 -- Reconnect and drop it
 \c - -
--- LOAD 'pgtt';
-
 -- Cleanup
 DROP TABLE t_glob_temptable1;
-

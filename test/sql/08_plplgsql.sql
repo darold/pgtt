@@ -5,9 +5,6 @@
 --
 ----
 
--- Import the library
--- LOAD 'pgtt';
-
 CREATE OR REPLACE FUNCTION test_temp_table ()
 RETURNS integer
 AS $$
@@ -59,7 +56,6 @@ SELECT * FROM t_glob_temptable1;
 
 -- Reconnect without dropping the global temporary table
 \c - -
--- LOAD 'pgtt';
 
 SET pgtt.enabled TO off;
 VACUUM pg_class;
@@ -85,7 +81,6 @@ SELECT regexp_replace(n.nspname, '\d+', 'x', 'g'), c.relname FROM pg_class c JOI
 
 -- Reconnect and drop it
 \c - -
--- LOAD 'pgtt';
 
 -- Cleanup
 DROP TABLE t_glob_temptable1;
