@@ -1085,7 +1085,7 @@ strpos(char *hay, char *needle, int offset)
 	haystack = (char *) malloc(strlen(hay));
 	if (haystack == NULL)
 	{
-		fprintf(stderr, _("out of memory\n"));
+		fprintf(stderr, "out of memory\n");
 		exit(EXIT_FAILURE);
 		return -1;
 	}
