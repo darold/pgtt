@@ -15,7 +15,7 @@ SHLIB_LINK = $(libpq)
 DOCS = $(wildcard README*)
 MODULES = pgtt
 
-DATA = $(wildcard updates/*--*.sql) sql/$(EXTENSION)--$(EXTVERSION).sql
+DATA = $(wildcard updates/*--*.sql) $(wildcard sql/*.sql)
 
 TESTS        = 00_init 01_oncommitdelete 02_oncommitpreserve \
 	       03_createontruncate 04_rename 05_useindex \
