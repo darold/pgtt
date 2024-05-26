@@ -271,6 +271,17 @@ _PG_init(void)
 							NULL);
 
 	/*
+	 * Immediately try to load the extension.  This will probably be a no-op in
+	 * the recommended "session_preload_libraries = 'pgtt'" configuration, as
+	 * it will happen outside of a transaction, but if the extension is
+	 * explicitly loaded with a plain LOAD command then the search_path would
+	 * only be changed after the next command is executed.  It means that the
+	 * very first query executed after such a LOAD wouldn't see the global
+	 * temporary tables.
+	 */
+	gtt_try_load();
+
+	/*
 	 * Install hooks.
 	 */
 	prev_ExecutorStart = ExecutorStart_hook;
@@ -1895,7 +1906,7 @@ is_catalog_relid(Oid relid)
 
 /*
  * Be sure that extension schema is at end of the search path so that
- * "template" tables will be find.
+ * "template" tables will be found.
  */
 static void
 force_pgtt_namespace (void)
