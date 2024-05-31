@@ -1,3 +1,31 @@
+Version 4.0 - May 31 2024
+
+This major release allow preloading pgtt in session_preload_libraries
+and adds support to Windows operating system. Here is the complete list
+of changes.
+
+  - Add port to Windows operating system. Note that, for some unknown reasons
+    it doesn't work at all with PostgreSQL 13. Thanks to Julien Rouhaud for
+    the patch
+  - Allow preloading pgtt in session_preload_libraries. The module is now lazily
+    loaded when it might be needed (after parse analysis, before executor
+    startup and before utility statements execution), and all the code is simply
+    bypassed if the underlying extension has not been created. Thanks to Julien
+    Rouhaud for the patch.
+  - Fix first query execution after a LOAD command. If the extension is loaded
+    with a plain LOAD command, the search_path will only be set during the next
+    query execution.  It means that the very first query executed after such a
+    LOAD wouldn't see the global temporary tables. Thanks to Julien Rouhaud for
+    the patch.
+  - Remove the relocation test, the extension is not relocatable anymore.
+  - Fix crash with RESET ALL. RESET ALL has a NULL "name" field, so we can't use
+    strcmp in that case.  Since the existing code is only interested in SET
+    commands, just move up the check that the command is a VAR_SET_VALUE to
+    ensure that we will have a GUC name. Thanks to Julien Rouhaud for the patch.
+  - Fix various minor whitespace and indent issues. Thanks to Julien Rouhaud for
+    the patch.
+  - Add Julen Rouhaud in the authors and maintainers list.
+
 Version 3.2 - Apr 12 2024
 
 This is a maintenance release to fix issues reported by users since latest

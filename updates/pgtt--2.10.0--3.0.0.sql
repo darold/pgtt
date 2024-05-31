@@ -1,5 +1,5 @@
 --  complain if script is sourced in psql, rather than via CREATE EXTENSION
-\echo Use "CREATE EXTENSION pgtt" to load this file. \quit
+\echo Use "ALTER EXTENSION pgtt UPDATE" to load this file. \quit
 
 -- check the functions bodies as creation time, enabled by default
 SET LOCAL check_function_bodies = on ;
