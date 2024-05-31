@@ -210,8 +210,8 @@ do { \
 
 /* Function declarations */
 
-void	_PG_init(void);
-void	_PG_fini(void);
+PGDLLEXPORT void	_PG_init(void);
+PGDLLEXPORT void	_PG_fini(void);
 
 int strpos(char *hay, char *needle, int offset);
 static Oid gtt_create_table_statement(Gtt gtt);
