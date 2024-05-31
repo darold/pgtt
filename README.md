@@ -13,12 +13,12 @@
 pgtt is a PostgreSQL extension to create, manage and use Oracle-style
 Global Temporary Tables and the others RDBMS.
 
-The objective of this extension it to propose an extension to provide
-the Global Temporary Table feature waiting for an in core
-implementation. The main interest of this extension is to mimic the
-Oracle behavior with GTT when you can not or don't want to rewrite the
-application code when migrating to PostgreSQL. In all other case best
-is to rewrite the code to use standard PostgreSQL temporary tables.
+The objective of this extension it to provide the Global Temporary Table
+feature to PostgreSQL waiting for an in core implementation. The main
+interest of this extension is to mimic the Oracle behavior with GTT when
+you can not or don't want to rewrite the application code when migrating
+to PostgreSQL. In all other case best is to rewrite the code to use standard
+PostgreSQL temporary tables.
 
 This version of the GTT extension use a regular unlogged table as
 "template" table and an internal rerouting to a temporary table. See
