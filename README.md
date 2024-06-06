@@ -120,7 +120,7 @@ add the library to the $libdir/plugins/ directory.
 	cd $libdir/plugins/
 	sudo ln -s ../pgtt.so
 
-Then it will be possible to use it using `session_preload_libraries = '$libdir/plugins/pgtt'` in postgresql.conf
+Then it will be possible to use it using `session_preload_libraries = 'pgtt'` in postgresql.conf
 To create and manage GTT using a non-superuser role you will have to grant
 the CREATE privilege on the `pgtt_schema` schema to the user. For example:
 
