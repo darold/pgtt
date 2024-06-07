@@ -63,6 +63,9 @@ DROP TABLE t_glob_temptable1;
 SHOW search_path;
 DROP TABLE t_glob_temptable1;
 
+VACUUM pg_class;
+SELECT pg_sleep(1);
+
 -- Look at Global Temporary Table definition
 SELECT nspname, relname, preserved, code FROM pgtt_schema.pg_global_temp_tables; -- should be empty
 
