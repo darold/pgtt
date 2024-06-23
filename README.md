@@ -112,15 +112,9 @@ package. Once `pg_config` is in your path, do
 	make
 	sudo make install
 
-If the extension will be used by a non-superuser role, you need to
-add the library to the $libdir/plugins/ directory.
+Then it will be possible to use it using `session_preload_libraries = 'pgtt'`
+in postgresql.conf
 
-	export libdir=$(pg_config --pkglibdir)
-	sudo mkdir $libdir/plugins/
-	cd $libdir/plugins/
-	sudo ln -s ../pgtt.so
-
-Then it will be possible to use it using `session_preload_libraries = 'pgtt'` in postgresql.conf
 To create and manage GTT using a non-superuser role you will have to grant
 the CREATE privilege on the `pgtt_schema` schema to the user. For example:
 
