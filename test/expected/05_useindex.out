@@ -105,5 +105,19 @@ ORDER BY i.indisprimary DESC, c2.relname;
  CREATE INDEX t_glob_temptable2_id_idx ON pgtt_schema.t_glob_temptable2 USING btree (id)
 (1 row)
 
+-- Check that we do not break LIKE ... USING INDEXES
+CREATE TABLE tb_with_index (id integer PRIMARY KEY, lbl varchar);
+CREATE INDEX ON tb_with_index(lbl);
+CREATE TEMPORARY TABLE temptb_with_index (LIKE tb_with_index INCLUDING INDEXES);
+\d temptb_with_index
+             Table "pg_temp_3.temptb_with_index"
+ Column |       Type        | Collation | Nullable | Default 
+--------+-------------------+-----------+----------+---------
+ id     | integer           |           | not null | 
+ lbl    | character varying |           |          | 
+Indexes:
+    "temptb_with_index_pkey" PRIMARY KEY, btree (id)
+    "temptb_with_index_lbl_idx" btree (lbl)
+
 \c - -
 DROP TABLE t_glob_temptable2;

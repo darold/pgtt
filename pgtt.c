@@ -142,6 +142,7 @@ static void gtt_try_load(void);
 #if PG_VERSION_NUM < 160000
 Oid get_extension_schema(Oid ext_oid);
 #endif
+static bool is_declared_gtt(Oid relid);
 
 /* Enable use of Global Temporary Table at session level */
 bool pgtt_is_enabled = true;
@@ -956,15 +957,17 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 
 			/* Just take care that the GTT is not in use */
 			nspname = get_namespace_name(get_rel_namespace(relid));
-			if (strcmp(nspname, pgtt_namespace_name) != 0)
+			if (is_declared_gtt(relid))
 			{
-				if (strstr(nspname, "pg_temp") != NULL)
-					elog(ERROR, "a temporary table has been created and is active, can not add an index on the GTT table in this session.");
+				if (strcmp(nspname, pgtt_namespace_name) != 0)
+				{
+					if (strstr(nspname, "pg_temp") != NULL)
+						elog(ERROR, "a temporary table has been created and is active, can not add an index on the GTT table in this session.");
+				}
 			}
 
 			break;
 		}
-
 
 		default:
 			break;
@@ -1086,6 +1089,55 @@ gtt_table_exists(QueryDesc *queryDesc)
 
 	return is_gtt;
 }
+
+static bool
+is_declared_gtt(Oid relid)
+{
+	char    *name = NULL;
+	char    relpersistence;
+	Relation      rel;
+	Gtt           gtt;
+
+	if (GttHashTable == NULL)
+		return false;
+
+	/* This must be a valid relation and not a temporary table */
+	if (relid != InvalidOid && !is_catalog_relid(relid))
+	{
+#if (PG_VERSION_NUM >= 120000)
+		rel = table_open(relid, NoLock);
+#else
+		rel = heap_open(relid, NoLock);
+#endif
+		name = RelationGetRelationName(rel);
+		relpersistence = rel->rd_rel->relpersistence;
+#if (PG_VERSION_NUM >= 120000)
+		table_close(rel, NoLock);
+#else
+		heap_close(rel, NoLock);
+#endif
+
+		/* Do not go further with temporary tables, catalog or toast table */
+		if (relpersistence != RELPERSISTENCE_TEMP)
+			return false;
+
+		/* Check if the table is in the hash list and it has not already be created */
+		gtt.relid = 0;
+		gtt.temp_relid = 0;
+		gtt.relname[0] = '\0';
+		gtt.preserved = false;
+		gtt.code = NULL;
+		gtt.created = false;
+		if (PointerIsValid(name))
+			GttHashTableLookup(name, gtt);
+
+		if (gtt.relname[0] != '\0')
+			return true;
+	}
+
+	return false;
+}
+
 
 int
 strpos(char *hay, char *needle, int offset)
