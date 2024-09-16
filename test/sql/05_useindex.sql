@@ -77,13 +77,15 @@ LEFT JOIN pg_catalog.pg_constraint con ON (conrelid = i.indrelid AND conindid = 
 WHERE c.oid = 'pgtt_schema.t_glob_temptable2'::regclass::oid AND c.oid = i.indrelid AND i.indexrelid = c2.oid
 ORDER BY i.indisprimary DESC, c2.relname;
 
-\c - -
-
 -- Check that we do not break LIKE ... USING INDEXES
 CREATE TABLE tb_with_index (id integer PRIMARY KEY, lbl varchar);
 CREATE INDEX ON tb_with_index(lbl);
 CREATE TEMPORARY TABLE temptb_with_index (LIKE tb_with_index INCLUDING INDEXES);
-\d temptb_with_index
+SELECT c2.relname, pg_catalog.pg_get_indexdef(i.indexrelid, 0, true), pg_catalog.pg_get_constraintdef(con.oid, true)
+FROM pg_catalog.pg_class c, pg_catalog.pg_class c2, pg_catalog.pg_index i
+  LEFT JOIN pg_catalog.pg_constraint con ON (conrelid = i.indrelid AND conindid = i.indexrelid AND contype IN ('p','u','x'))
+WHERE c.oid = 'temptb_with_index'::regclass AND c.oid = i.indrelid AND i.indexrelid = c2.oid
+ORDER BY i.indisprimary DESC, c2.relname;
 
 \c - -
 
