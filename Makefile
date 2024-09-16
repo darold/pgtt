@@ -12,7 +12,7 @@ PG_LIBDIR := $(shell $(PG_CONFIG) --libdir)
 
 SHLIB_LINK = $(libpq)
 
-DOCS = $(wildcard README*)
+DOCS = pgtt.md
 MODULES = pgtt
 
 DATA = $(wildcard updates/*--*.sql) $(wildcard sql/*.sql)
