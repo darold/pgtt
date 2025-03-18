@@ -1,3 +1,23 @@
+Version 4.1 - March 18 2025
+
+This is a maintenance release to fix issues reported by users since latest
+release.
+
+  - Use query instead of \d to list indexes in regression tests.
+  - Fix wrong complain about temporary table created and active when a
+    regular temporary table is created with (LIKE ... INCLUDING INDEXES).
+    Thanks to Benjamin Wirth for the report.
+  - Remove documentation for non-superuser configuration. Thanks to Julien
+    Rouhaud for the patch.
+  - Fix config in README. The concrete path to the shared library is not
+    needed in postgresql.conf. Thanks to Simon Martin for the patch.
+  - Install docs to a non-generic name, add a symlink to README.md that is
+    referenced in DOCS. Thanks to Christoph Berg for the patch.
+  - Add vaccum pg_class + pg_sleep(1) after each drop table in regression
+    tests to wait that the temporary table is really removed.
+  - Add missing PGDLLEXPORT tags on callback functions, those are needed on
+    windows. Thanks to Julien Rouhaud for the patch.
+
 Version 4.0 - May 31 2024
 
 This major release allow preloading pgtt in session_preload_libraries
