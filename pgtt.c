@@ -1685,7 +1685,11 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 		if (IsA(cur_stmt, CreateStmt))
 		{
 			Datum           toast_options;
+#if PG_VERSION_NUM < 180000
 			static char     *validnsps[] = HEAP_RELOPT_NAMESPACES;
+#else
+			const char     *validnsps[] = HEAP_RELOPT_NAMESPACES;
+#endif
 			Oid             temp_relowner;
 
 			/* Temporary table owner must be current user */
