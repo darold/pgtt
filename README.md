@@ -170,8 +170,6 @@ The pgtt extension use a dedicated schema to store related objects,
 by default: `pgtt_schema`. The extension take care that this schema
 is always at end of the `search_path`.
 
-	gtt_testdb=# LOAD '$libdir/plugins/pgtt';
-	LOAD
 	gtt_testdb=# SHOW search_path;
 	    search_path
 	--------------------
