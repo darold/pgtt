@@ -166,18 +166,6 @@ or by setting it at database level as follow:
 	$$;
 
 
-non-superuser must load the library using the plugins/ directory
-as follow:
-
-	DO $$
-	BEGIN
-	    EXECUTE format('ALTER DATABASE %I SET session_preload_libraries = ''$libdir/plugins/pgtt''', current_database());
-	END
-	$$;
-
-Take care to follow installation instruction above to create the
-symlink from the plugins/ directory to the extension library file.
-
 The pgtt extension use a dedicated schema to store related objects,
 by default: `pgtt_schema`. The extension take care that this schema
 is always at end of the `search_path`.
