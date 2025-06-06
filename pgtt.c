@@ -1965,60 +1965,42 @@ is_catalog_relid(Oid relid)
  * "template" tables will be found.
  */
 static void
-force_pgtt_namespace (void)
+force_pgtt_namespace(void)
 {
-#if PG_VERSION_NUM >= 170000
-	SearchPathMatcher  *overridePath;
-#else
-	OverrideSearchPath *overridePath;
-#endif
-	ListCell           *lc;
-	Oid                schemaId = InvalidOid;
-	StringInfoData     search_path;
-	bool               found = false;
-	bool               first = true;
+	bool			override = false;
+	char		   *old_search_path;
+	const char	   *pgtt_schema = quote_identifier(pgtt_namespace_name);
+	StringInfoData	search_path;
 
 	if (!IsTransactionState() || GttHashTable == NULL)
 		return;
 
-#if PG_VERSION_NUM >= 170000
-	overridePath = GetSearchPathMatcher(CurrentMemoryContext);
-#else
-	overridePath = GetOverrideSearchPath(CurrentMemoryContext);
-#endif
-
 	initStringInfo(&search_path);
-	/* verify that extension schema is in the path */
-	foreach(lc, overridePath->schemas)
+
+	old_search_path = GetConfigOptionByName("search_path", NULL, false);
+	if (old_search_path == NULL)
 	{
-		schemaId = lfirst_oid(lc);
-		if (schemaId == InvalidOid)
-			continue;
-		if (schemaId == pgtt_namespace_oid)
-			found = true;
-		if (!first)
-			appendStringInfoChar(&search_path, ',');
-		appendStringInfo(&search_path, "%s", quote_identifier(get_namespace_name(schemaId)));
-		first = false;
+		appendStringInfo(&search_path, "%s", pgtt_schema);
+		override = true;
+	}
+	else
+	{
+		if (strstr(old_search_path, pgtt_schema) == NULL)
+		{
+			appendStringInfo(&search_path, "%s, %s", old_search_path, pgtt_schema);
+			override = true;
+		}
 	}
 
-	if (!found)
+	if (override)
 	{
-		if (!first)
-			appendStringInfoChar(&search_path, ',');
-		appendStringInfo(&search_path, "%s", quote_identifier(pgtt_namespace_name));
-		/*
-		 * Override the search_path by adding our pgtt schema
-		 */
-		(void) set_config_option("search_path",
-								 search_path.data,
-								 (superuser() ? PGC_SUSET : PGC_USERSET),
-								 PGC_S_SESSION,
-								 GUC_ACTION_SET, true, 0,
-								 false
-								 );
+		/* Override the search_path by adding our pgtt schema. */
+		SetConfigOption("search_path", search_path.data,
+						(superuser() ? PGC_SUSET : PGC_USERSET),
+						PGC_S_SESSION);
+
+		elog(DEBUG1, "search_path forced to %s.", search_path.data);
 	}
-	elog(DEBUG1, "search_path forced to %s.", search_path.data);
 }
 
 /*
