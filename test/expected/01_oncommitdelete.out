@@ -94,9 +94,9 @@ ERROR:  can not drop a GTT that is in use.
 -- Reconnect and drop it
 \c - -
 SHOW search_path;
-    search_path     
---------------------
- public,pgtt_schema
+         search_path          
+------------------------------
+ "$user", public, pgtt_schema
 (1 row)
 
 DROP TABLE t_glob_temptable1;
