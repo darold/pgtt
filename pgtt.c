@@ -1983,13 +1983,31 @@ force_pgtt_namespace(void)
 		appendStringInfo(&search_path, "%s", pgtt_schema);
 		override = true;
 	}
-	else
+	else if (strstr(old_search_path, pgtt_schema) == NULL)
 	{
-		if (strstr(old_search_path, pgtt_schema) == NULL)
+		/*
+		 * first look if pg_catalog is at end of the search path to keep
+		 * it at end. This is not the same behavior if it not kept at the
+		 * end when there is pg_catalog functions overloaded in another
+		 * schema
+		 */
+		bool at_end = false;
+		int len = strlen(old_search_path) - 11;
+		char *p = strstr(old_search_path, "pg_catalog");
+		if (p != NULL && strcmp(p, "pg_catalog") == 0)
+		{
+			if (len > 11)
+				old_search_path[len] = '\0';
+			appendStringInfo(&search_path, "%s %s", old_search_path, pgtt_schema);
+			at_end = true;
+		}
+		else
 		{
 			appendStringInfo(&search_path, "%s, %s", old_search_path, pgtt_schema);
-			override = true;
 		}
+		if (at_end)
+			appendStringInfo(&search_path, ", pg_catalog");
+		override = true;
 	}
 
 	if (override)
