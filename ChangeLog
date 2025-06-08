@@ -1,3 +1,20 @@
+Version 4.2 - June 08 2025
+
+This is a maintenance release to fix issues reported by users since latest
+release and especially a search_path modification issue.
+
+  - Preserve pg_catalog at end of search path if it is the case to allow
+    pg_catalog overloaded function to be executed.
+  - Add regression test on search_path forcing.
+  - Preserve $user and other elements in search_path. Thanks to Japin Li
+    for the patch.
+  - Remove the LOAD command from documentation. Thanks to Li Jianping for the
+    patch.
+  - Fix session_preload_libraries documentation for non-superusers. Thanks
+    to Japin Li for the patch.
+  - Resolve a warning regarding incompatible pointer types. Thanks to Li
+    Jianping for the patch.
+
 Version 4.1 - March 18 2025
 
 This is a maintenance release to fix issues reported by users since latest
