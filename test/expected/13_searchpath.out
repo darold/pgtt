@@ -1,0 +1,43 @@
+----
+-- Regression test to Global Temporary Table implementation
+--
+-- Test on search_path forced by the extension
+--
+----
+SHOW search_path ;
+         search_path          
+------------------------------
+ "$user", public, pgtt_schema
+(1 row)
+
+create schema first_schema;
+create schema second_schema;
+SET search_path TO "$user", public, fisrt_schema, second_schema,pg_catalog;
+SHOW search_path ;
+                              search_path                              
+-----------------------------------------------------------------------
+ "$user", public, fisrt_schema, second_schema, pg_catalog, pgtt_schema
+(1 row)
+
+CREATE EXTENSION pgtt;
+ERROR:  extension "pgtt" already exists
+SHOW search_path ;
+                              search_path                              
+-----------------------------------------------------------------------
+ "$user", public, fisrt_schema, second_schema, pg_catalog, pgtt_schema
+(1 row)
+
+SET search_path TO pg_catalog;
+SHOW search_path ;
+       search_path       
+-------------------------
+ pg_catalog, pgtt_schema
+(1 row)
+
+SET search_path TO public;
+SHOW search_path ;
+     search_path     
+---------------------
+ public, pgtt_schema
+(1 row)
+
