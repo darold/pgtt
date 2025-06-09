@@ -1,3 +1,14 @@
+Version 4.3 - June 09 2025
+
+This is a quick maintenance release to fix an issue introduced in latest
+release.
+
+  - Drop extension before running tests on search_path.
+  - Fix invalid search_path error. When pgtt isn't preloaded and pg_catalog
+    is the last element in search_path, results in error message "invalid
+    value for parameter 'search_path'" due to invalid list syntax. Thanks
+    to Japin Li for the patch.
+
 Version 4.2 - June 08 2025
 
 This is a maintenance release to fix issues reported by users since latest

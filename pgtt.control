@@ -1,4 +1,4 @@
-default_version = '4.2.0'
+default_version = '4.3.0'
 comment = 'Extension to add Global Temporary Tables feature to PostgreSQL'
 module_pathname = '$libdir/pgtt'
 schema = 'pgtt_schema'
