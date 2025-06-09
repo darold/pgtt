@@ -1992,12 +1992,15 @@ force_pgtt_namespace(void)
 		 * schema
 		 */
 		bool at_end = false;
-		int len = strlen(old_search_path) - 11;
+		int len = strlen(old_search_path) - 10;
 		char *p = strstr(old_search_path, "pg_catalog");
 		if (p != NULL && strcmp(p, "pg_catalog") == 0)
 		{
-			if (len > 11)
-				old_search_path[len] = '\0';
+			/* remove redundant whitespaces */
+			while (len > 0 && isspace(old_search_path[len - 1]))
+				len--;
+			old_search_path[len] = '\0';
+
 			appendStringInfo(&search_path, "%s %s", old_search_path, pgtt_schema);
 			at_end = true;
 		}

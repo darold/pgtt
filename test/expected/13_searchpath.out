@@ -41,3 +41,43 @@ SHOW search_path ;
  public, pgtt_schema
 (1 row)
 
+-- Test only pg_catalog in search_path.
+DROP EXTENSION pgtt;
+\c - -
+SHOW search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+SET search_path TO pg_catalog;
+SHOW search_path;
+ search_path 
+-------------
+ pg_catalog
+(1 row)
+
+CREATE EXTENSION pgtt;
+SHOW search_path;
+       search_path        
+--------------------------
+  pgtt_schema, pg_catalog
+(1 row)
+
+-- Test the pg_catalog at end of search_path.
+DROP EXTENSION pgtt;
+\c - -
+SET search_path TO "$user", public, pg_catalog;
+SHOW search_path;
+         search_path         
+-----------------------------
+ "$user", public, pg_catalog
+(1 row)
+
+CREATE EXTENSION pgtt;
+SHOW search_path;
+               search_path                
+------------------------------------------
+ "$user", public, pgtt_schema, pg_catalog
+(1 row)
+

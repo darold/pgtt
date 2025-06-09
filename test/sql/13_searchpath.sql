@@ -17,3 +17,20 @@ SET search_path TO pg_catalog;
 SHOW search_path ;
 SET search_path TO public;
 SHOW search_path ;
+
+-- Test only pg_catalog in search_path.
+DROP EXTENSION pgtt;
+\c - -
+SHOW search_path;
+SET search_path TO pg_catalog;
+SHOW search_path;
+CREATE EXTENSION pgtt;
+SHOW search_path;
+
+-- Test the pg_catalog at end of search_path.
+DROP EXTENSION pgtt;
+\c - -
+SET search_path TO "$user", public, pg_catalog;
+SHOW search_path;
+CREATE EXTENSION pgtt;
+SHOW search_path;
