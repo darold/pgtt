@@ -4,6 +4,7 @@
 -- Test on search_path forced by the extension
 --
 ----
+DROP EXTENSION pgtt;
 SHOW search_path ;
          search_path          
 ------------------------------
@@ -12,19 +13,18 @@ SHOW search_path ;
 
 create schema first_schema;
 create schema second_schema;
-SET search_path TO "$user", public, fisrt_schema, second_schema,pg_catalog;
+SET search_path TO "$user",public,pg_catalog,fisrt_schema,second_schema;
 SHOW search_path ;
                               search_path                              
 -----------------------------------------------------------------------
- "$user", public, fisrt_schema, second_schema, pg_catalog, pgtt_schema
+ "$user", public, pg_catalog, fisrt_schema, second_schema, pgtt_schema
 (1 row)
 
 CREATE EXTENSION pgtt;
-ERROR:  extension "pgtt" already exists
 SHOW search_path ;
                               search_path                              
 -----------------------------------------------------------------------
- "$user", public, fisrt_schema, second_schema, pg_catalog, pgtt_schema
+ "$user", public, pg_catalog, fisrt_schema, second_schema, pgtt_schema
 (1 row)
 
 SET search_path TO pg_catalog;

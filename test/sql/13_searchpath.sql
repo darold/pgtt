@@ -4,12 +4,12 @@
 -- Test on search_path forced by the extension
 --
 ----
-
+DROP EXTENSION pgtt;
 
 SHOW search_path ;
 create schema first_schema;
 create schema second_schema;
-SET search_path TO "$user", public, fisrt_schema, second_schema,pg_catalog;
+SET search_path TO "$user",public,pg_catalog,fisrt_schema,second_schema;
 SHOW search_path ;
 CREATE EXTENSION pgtt;
 SHOW search_path ;
