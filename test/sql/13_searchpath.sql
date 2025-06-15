@@ -34,3 +34,7 @@ SET search_path TO "$user", public, pg_catalog;
 SHOW search_path;
 CREATE EXTENSION pgtt;
 SHOW search_path;
+
+-- Test empty search path like set by pg_dump
+SELECT pg_catalog.set_config('search_path', '', false);
+SHOW search_path;

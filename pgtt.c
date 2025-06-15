@@ -1983,7 +1983,7 @@ force_pgtt_namespace(void)
 		appendStringInfo(&search_path, "%s", pgtt_schema);
 		override = true;
 	}
-	else if (strstr(old_search_path, pgtt_schema) == NULL)
+	else if (strlen(old_search_path) > 0 && strstr(old_search_path, pgtt_schema) == NULL)
 	{
 		/*
 		 * first look if pg_catalog is at end of the search path to keep
