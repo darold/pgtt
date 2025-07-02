@@ -1,16 +1,16 @@
 {
    "name": "pgtt",
    "abstract": "Extension to add Global Temporary Tables feature to PostgreSQL.",
-   "version": "4.3.0",
+   "version": "4.4.0",
    "maintainer": "Gilles Darold <gilles@darold.net>",
    "license": "postgresql",
    "release_status": "stable",
    "provides": {
       "pgtt": {
          "abstract": "Extension to manage Global Temporary Tables",
-         "file": "sql/pgtt--4.3.0.sql",
+         "file": "sql/pgtt--4.4.0.sql",
          "docfile": "doc/pgtt.md",
-         "version": "4.3.0"
+         "version": "4.4.0"
       }
    },
    "resources": {
