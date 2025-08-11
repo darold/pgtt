@@ -78,6 +78,7 @@
 
 #define CATALOG_GLOBAL_TEMP_REL	"pg_global_temp_tables"
 #define Anum_pgtt_relid   1
+#define Anum_pgtt_nspname 2
 #define Anum_pgtt_relname 3
 
 PG_MODULE_MAGIC;
@@ -217,7 +218,7 @@ PGDLLEXPORT void	_PG_fini(void);
 int strpos(char *hay, char *needle, int offset);
 static Oid gtt_create_table_statement(Gtt gtt);
 static void gtt_create_table_as(Gtt gtt, bool skipdata);
-static void gtt_unregister_global_temporary_table(Oid relid, const char *relname);
+static void gtt_unregister_global_temporary_table(const char *relname);
 void GttHashTableDeleteAll(void);
 bool EnableGttManager(void);
 Gtt GetGttByName(const char *name);
@@ -801,7 +802,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 						 * Unregister the Global Temporary Table and its link to the
 						 * view stored in pg_global_temp_tables table
 						 */
-						gtt_unregister_global_temporary_table(gtt.relid, gtt.relname);
+						gtt_unregister_global_temporary_table(gtt.relname);
 
 						/* Remove the table from the hash table */
 						GttHashTableDelete(gtt.relname);
@@ -1250,7 +1251,7 @@ gtt_create_table_statement(Gtt gtt)
  * using his relid.
  */
 static void
-gtt_unregister_global_temporary_table(Oid relid, const char *relname)
+gtt_unregister_global_temporary_table(const char *relname)
 {
 	RangeVar     *rv;
 	Relation      rel;
@@ -1258,7 +1259,7 @@ gtt_unregister_global_temporary_table(Oid relid, const char *relname)
 	SysScanDesc   scan;
 	HeapTuple     tuple;
 
-	elog(DEBUG1, "Looking for registered GTT relid = %d, relname = %s", relid, relname);
+	elog(DEBUG1, "Looking for registered GTT relname = %s", relname);
 
 	/* Set and open the GTT relation */
 	rv = makeRangeVar(pgtt_namespace_name, CATALOG_GLOBAL_TEMP_REL, -1);
@@ -1268,14 +1269,14 @@ gtt_unregister_global_temporary_table(Oid relid, const char *relname)
 	rel = heap_openrv(rv, RowExclusiveLock);
 #endif
 	/* Define scanning */
-	ScanKeyInit(&key[0], Anum_pgtt_relid, BTEqualStrategyNumber, F_OIDEQ, ObjectIdGetDatum(relid));
+	ScanKeyInit(&key[0], Anum_pgtt_relname, BTEqualStrategyNumber, F_NAMEEQ, CStringGetDatum(relname));
 
 	/* Start search of relation */
 	scan = systable_beginscan(rel, 0, true, NULL, 1, key);
 	/* Remove the tuples. */
 	while (HeapTupleIsValid(tuple = systable_getnext(scan)))
 	{
-		elog(DEBUG1, "removing tuple with relid = %d and relname = %s", relid, relname);
+		elog(DEBUG1, "removing tuple with relname = %s", relname);
 		simple_heap_delete(rel, &tuple->t_self);
 	}
 	/* Cleanup. */
@@ -1558,19 +1559,22 @@ gtt_load_global_temporary_tables(void)
 	tupleDesc = RelationGetDescr(rel);
 	numberOfAttributes = tupleDesc->natts;
 	while (HeapTupleIsValid(tuple = heap_getnext(scan, ForwardScanDirection)))
-		{
+	{
+		Oid namespaceId;
 		Gtt gtt;
 		Datum *values = (Datum *) palloc(numberOfAttributes * sizeof(Datum));
 		bool *isnull = (bool *) palloc(numberOfAttributes * sizeof(bool));
 
 		/* Extract data */
 		heap_deform_tuple(tuple, tupleDesc, values, isnull);
-		gtt.relid = DatumGetInt32(values[0]);
 		strcpy(gtt.relname, NameStr(*(DatumGetName(values[2]))));
 		gtt.preserved = DatumGetBool(values[3]);
 		gtt.code = TextDatumGetCString(values[4]);
 		gtt.created = false;
 		gtt.temp_relid = 0;
+		/* get relation id */
+		namespaceId = LookupExplicitNamespace(pgtt_namespace_name, false);
+		gtt.relid = get_relname_relid(gtt.relname, namespaceId);
 		/* Add table to cache */
 		GttHashTableInsert(gtt, gtt.relname);
 	}
@@ -2037,7 +2041,7 @@ gtt_update_registered_table(Gtt gtt)
 	int     finished = 0;
 	int     result = 0;
 
-	elog(DEBUG1, "proceeding to Global Temporary Table creation.");
+	elog(DEBUG1, "proceeding to Global Temporary Table modification.");
 
 	connected = SPI_connect();
 	if (connected != SPI_OK_CONNECT)
