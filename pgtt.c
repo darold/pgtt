@@ -945,9 +945,17 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			/* CREATE INDEX statement */
 			IndexStmt  *stmt = (IndexStmt *) parsetree;
 			Oid        relid;
+			Oid        nspid;
 			char       *nspname;
-
-			relid = RangeVarGetRelidExtended(stmt->relation, ShareLock,
+			LOCKMODE lockmode = ShareLock;
+			/*
+			 * PATCH: Support CREATE INDEX CONCURRENTLY on active GTT instances.
+			 * We use ShareUpdateExclusiveLock to avoid blocking reads/writes
+			 * on the active session's data.
+			 */
+			if (stmt->concurrent)
+				lockmode = ShareUpdateExclusiveLock;
+			relid = RangeVarGetRelidExtended(stmt->relation, lockmode,
 #if (PG_VERSION_NUM >= 110000)
 				       					0,
 #else
@@ -956,14 +964,22 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 									RangeVarCallbackOwnsRelation,
 									NULL);
 
-			/* Just take care that the GTT is not in use */
-			nspname = get_namespace_name(get_rel_namespace(relid));
+			/*
+			 * Ensure that the global temporary table (GTT) is not currently in use.
+			 * A GTT is considered "in use" only when its corresponding local temporary
+			 * table has been created in the session.
+			 */
+			nspid = get_rel_namespace(relid);
+			nspname = get_namespace_name(nspid);
 			if (is_declared_gtt(relid))
 			{
 				if (strcmp(nspname, pgtt_namespace_name) != 0)
 				{
-					if (strstr(nspname, "pg_temp") != NULL)
-						elog(ERROR, "a temporary table has been created and is active, can not add an index on the GTT table in this session.");
+					if (isTempNamespace(nspid))
+					{
+						if (!stmt->concurrent)
+							ereport(ERROR, (errmsg("a temporary table has been created and is active, can not add an index on the GTT table in this session.")));
+					}
 				}
 			}
 
