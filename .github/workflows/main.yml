@@ -2,27 +2,50 @@
 
 name: CI
 
-# Controls when the workflow will run
-on:
-  # Triggers the workflow on push or pull request events but only for the master branch
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+on: [push, pull_request]
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  test:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     strategy:
       matrix:
-        pg: [19, 18, 17, 16, 15, 14, 13, 12]
-    name: 🐘 PostgreSQL ${{ matrix.pg }}
-    runs-on: ubuntu-latest
-    container: pgxn/pgxn-tools
+        pgversion:
+          - 12
+          - 13
+          - 14
+          - 15
+          - 16
+          - 17
+          - 18
+          - 19
+
+    env:
+      PGVERSION: ${{ matrix.pgversion }}
+
     steps:
-      - run: pg-start ${{ matrix.pg }}
-      - uses: actions/checkout@v2
-      - run: pg-build-test
+    - name: checkout
+      uses: actions/checkout@v2
+
+    - name: install pg
+      run: |
+        sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -v $PGVERSION -p -i
+        sudo -u postgres createuser -s "$USER"
+
+    - name: build
+      run: |
+        make PROFILE="-Werror"
+        sudo -E make install
+
+    - name: test
+      run: |
+        sudo pg_conftool $PGVERSION main set shared_preload_libraries pgtt
+        sudo service postgresql restart
+        make installcheck
+
+    - name: show regression diffs
+      if: ${{ failure() }}
+      run: |
+        cat regression.diffs
