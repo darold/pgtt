@@ -41,8 +41,8 @@ jobs:
     - name: test
       run: |
         sudo pg_conftool $PGVERSION main set shared_preload_libraries pgtt
-        sudo pg_conftool $PGVERSION main set listen_addresses '*'
         sudo service postgresql restart
+        pg_isready
         make installcheck
 
     - name: show regression diffs
