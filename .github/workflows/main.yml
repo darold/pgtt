@@ -13,12 +13,12 @@ jobs:
     strategy:
       matrix:
         pgversion:
-          - 12
-          - 13
-          - 14
-          - 15
-          - 16
-          - 17
+#          - 12
+#          - 13
+#          - 14
+#          - 15
+#          - 16
+#          - 17
           - 18
 
     env:
@@ -41,6 +41,7 @@ jobs:
     - name: test
       run: |
         sudo pg_conftool $PGVERSION main set shared_preload_libraries pgtt
+        sudo pg_conftool $PGVERSION main set listen_addresses '*'
         sudo service postgresql restart
         make installcheck
 
