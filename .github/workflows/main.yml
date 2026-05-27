@@ -42,7 +42,12 @@ jobs:
       run: |
         sudo pg_conftool $PGVERSION main set shared_preload_libraries pgtt
         sudo service postgresql restart
-        pg_isready
+        # Poll until pg_isready returns successfully
+        until pg_isready -h localhost -p 5432 -U postgres; do
+          echo "Waiting for PostgreSQL to restart..."
+          sleep 1
+        done
+        echo "PostgreSQL is ready!"
         make installcheck
 
     - name: show regression diffs
