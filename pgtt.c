@@ -146,15 +146,15 @@ Oid get_extension_schema(Oid ext_oid);
 static bool is_declared_gtt(Oid relid);
 
 /* Enable use of Global Temporary Table at session level */
-bool pgtt_is_enabled = true;
+static bool pgtt_is_enabled = true;
 
 /* Regular expression search */
 #define CREATE_GLOBAL_REGEXP "^\\s*CREATE\\s+(?:\\/\\*\\s*)?GLOBAL(?:\\s*\\*\\/)?"
 #define CREATE_WITH_FK_REGEXP "\\s*FOREIGN\\s+KEY"
 
 /* Oid and name of pgtt extrension schema in the database */
-Oid pgtt_namespace_oid = InvalidOid;
-char pgtt_namespace_name[NAMEDATALEN];
+static Oid pgtt_namespace_oid = InvalidOid;
+static char pgtt_namespace_name[NAMEDATALEN];
 
 /* In memory storage of GTT and state */
 typedef struct Gtt
