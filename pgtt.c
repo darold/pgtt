@@ -1758,7 +1758,8 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 										 RangeVarCallbackOwnsRelation,
 										 NULL);
 
-			DefineIndex(relid,      /* OID of heap relation */
+			DefineIndex(NULL,		/* no ParseState pointer*/
+						relid,      /* OID of heap relation */
 						(IndexStmt *) cur_stmt,
 						InvalidOid, /* no predefined OID */
 #if (PG_VERSION_NUM >= 110000)
