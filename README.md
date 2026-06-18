@@ -554,4 +554,4 @@ not be the case.
 This extension is free software distributed under the PostgreSQL
 Licence.
 
-        Copyright (c) 2018-2025, Gilles Darold
+        Copyright (c) 2018-2026, Gilles Darold
