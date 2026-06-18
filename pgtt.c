@@ -134,10 +134,14 @@ static post_parse_analyze_hook_type prev_post_parse_analyze_hook = NULL;
 /* Hook to intercept CREATE GLOBAL TEMPORARY TABLE query */
 static void gtt_ProcessUtility(GTT_PROCESSUTILITY_PROTO);
 static void gtt_ExecutorStart(QueryDesc *queryDesc, int eflags);
+#if PG_VERSION_NUM >= 190000
+static void gtt_post_parse_analyze(ParseState *pstate, Query *query, const JumbleState *jstate);
+#else
 #if PG_VERSION_NUM >= 140000
-static void gtt_post_parse_analyze(ParseState *pstate, Query *query, struct JumbleState * jstate);
+static void gtt_post_parse_analyze(ParseState *pstate, Query *query, JumbleState *jstate);
 #else
 static void gtt_post_parse_analyze(ParseState *pstate, Query *query);
+#endif
 #endif
 static void gtt_try_load(void);
 #if PG_VERSION_NUM < 160000
@@ -223,7 +227,7 @@ void GttHashTableDeleteAll(void);
 bool EnableGttManager(void);
 Gtt GetGttByName(const char *name);
 static void gtt_load_global_temporary_tables(void);
-static Oid create_temporary_table_internal(Oid parent_relid, bool preserved);
+static Oid create_temporary_table_internal(ParseState *pstate, Oid parent_relid, bool preserved);
 static bool gtt_check_command(GTT_PROCESSUTILITY_PROTO);
 static bool gtt_table_exists(QueryDesc *queryDesc);
 void exitHook(int code, Datum arg);
@@ -765,7 +769,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 #if PG_VERSION_NUM < 150000
 				if (PointerIsValid(relationNameValue->val.str))
 #else
-				if (PointerIsValid(relationNameValue->sval))
+				if ((const void*)relationNameValue->sval != NULL)
 #endif
 				{
 #if PG_VERSION_NUM < 150000
@@ -1036,6 +1040,7 @@ gtt_table_exists(QueryDesc *queryDesc)
 	Relation      rel;
 	Gtt           gtt;
 	PlannedStmt *pstmt = (PlannedStmt *) queryDesc->plannedstmt;
+	ParseState *pstate = make_parsestate(NULL);
 
 	if (GttHashTable == NULL || !pstmt)
 		return false;
@@ -1074,7 +1079,7 @@ gtt_table_exists(QueryDesc *queryDesc)
 		gtt.created = false;
 
 		/* Check if the table is in the hash list and it has not already be created */
-		if (PointerIsValid(name))
+		if ((const void*)name != NULL)
 			GttHashTableLookup(name, gtt);
 
 		elog(DEBUG1, "gtt_table_exists() looking for table \"%s\" with relid %d into cache.", name, rte->relid);
@@ -1086,7 +1091,7 @@ gtt_table_exists(QueryDesc *queryDesc)
 			{
 				elog(DEBUG1, "global temporary table does not exists create it: %s", gtt.relname);
 				/* Call create temporary table */
-				if ((gtt.temp_relid = create_temporary_table_internal(gtt.relid, gtt.preserved)) != InvalidOid)
+				if ((gtt.temp_relid = create_temporary_table_internal(pstate, gtt.relid, gtt.preserved)) != InvalidOid)
 				{
 					elog(DEBUG1, "global temporary table %s (oid: %d) created", gtt.relname, gtt.temp_relid);
 					/* Update hash list with table flagged as created */
@@ -1145,7 +1150,8 @@ is_declared_gtt(Oid relid)
 		gtt.preserved = false;
 		gtt.code = NULL;
 		gtt.created = false;
-		if (PointerIsValid(name))
+
+		if ((const void*)name != NULL)
 			GttHashTableLookup(name, gtt);
 
 		if (gtt.relname[0] != '\0')
@@ -1529,7 +1535,7 @@ GetGttByName(const char *name)
 
 	Assert(GttHashTable != NULL);
 
-	if (PointerIsValid(name))
+	if ((const void*)name != NULL)
 		GttHashTableLookup(name, gtt);
 
 	return gtt;
@@ -1567,7 +1573,11 @@ gtt_load_global_temporary_tables(void)
 
 #if (PG_VERSION_NUM >= 120000)
 	rel = table_openrv(rv, AccessShareLock);
+#if (PG_VERSION_NUM >= 190000)
+	scan = table_beginscan(rel, snapshot, 0, (ScanKey) NULL, SO_NONE);
+#else
 	scan = table_beginscan(rel, snapshot, 0, (ScanKey) NULL);
+#endif
 #else
 	rel = heap_openrv(rv, AccessShareLock);
 	scan = heap_beginscan(rel, snapshot, 0, (ScanKey) NULL);
@@ -1608,7 +1618,7 @@ gtt_load_global_temporary_tables(void)
 }
 
 static Oid
-create_temporary_table_internal(Oid parent_relid, bool preserved)
+create_temporary_table_internal(ParseState *pstate, Oid parent_relid, bool preserved)
 {
 	/* Value to be returned */
 	Oid                         temp_relid = InvalidOid; /* safety */
@@ -1758,23 +1768,27 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 										 RangeVarCallbackOwnsRelation,
 										 NULL);
 
-			DefineIndex(relid,      /* OID of heap relation */
-						(IndexStmt *) cur_stmt,
-						InvalidOid, /* no predefined OID */
+			DefineIndex(
+#if (PG_VERSION_NUM >= 190000)
+					pstate,
+#endif
+					relid,      /* OID of heap relation */
+					(IndexStmt *) cur_stmt,
+					InvalidOid, /* no predefined OID */
 #if (PG_VERSION_NUM >= 110000)
-						InvalidOid, /* no parent index */
-						InvalidOid, /* no parent constraint */
+					InvalidOid, /* no parent index */
+					InvalidOid, /* no parent constraint */
 #endif
 #if (PG_VERSION_NUM >= 160000)
-						-1,/* total parts */
+					-1,/* total parts */
 #endif
-						false,  /* is_alter_table */
-						true,   /* check_rights */
+					false,  /* is_alter_table */
+					true,   /* check_rights */
 #if (PG_VERSION_NUM > 100000)
-						true,   /* check_not_in_use */
+					true,   /* check_not_in_use */
 #endif
-						false,  /* skip_build */
-						false); /* quiet */
+					false,  /* skip_build */
+					false); /* quiet */
 		}
 		else if (IsA(cur_stmt, CommentStmt))
 		{
@@ -1846,11 +1860,17 @@ create_temporary_table_internal(Oid parent_relid, bool preserved)
 /*
  * Post-parse-analysis hook: mark query with a queryId
  */
+#if PG_VERSION_NUM >= 190000
 static void
-#if PG_VERSION_NUM >= 140000
-gtt_post_parse_analyze(ParseState *pstate, Query *query, struct JumbleState * jstate)
+gtt_post_parse_analyze(ParseState *pstate, Query *query, const JumbleState *jstate)
 #else
+#if PG_VERSION_NUM >= 140000
+static void
+gtt_post_parse_analyze(ParseState *pstate, Query *query, JumbleState *jstate)
+#else
+static void
 gtt_post_parse_analyze(ParseState *pstate, Query *query)
+#endif
 #endif
 {
 	/* Try to load pgtt if not already done. */
@@ -1889,7 +1909,7 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query)
 			gtt.created = false;
 
 			/* Check if the table is in the hash list and it has not already be created */
-			if (PointerIsValid(name))
+			if ((const void*)name != NULL)
 			{
 				elog(DEBUG1, "gtt_post_parse_analyze() looking for table \"%s\" with relid %d into cache.", name, rte->relid);
 				GttHashTableLookup(name, gtt);
@@ -1913,7 +1933,7 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query)
 				{
 					elog(DEBUG1, "global temporary table from relid %d does not exists create it: %s", rte->relid, gtt.relname);
 					/* Call create temporary table */
-					if ((gtt.temp_relid = create_temporary_table_internal(gtt.relid, gtt.preserved)) != InvalidOid)
+					if ((gtt.temp_relid = create_temporary_table_internal(pstate, gtt.relid, gtt.preserved)) != InvalidOid)
 					{
 						elog(DEBUG1, "global temporary table %s (oid: %d) created", gtt.relname, gtt.temp_relid);
 						/* Update hash list with table flagged as created*/
