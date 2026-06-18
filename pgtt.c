@@ -1040,7 +1040,6 @@ gtt_table_exists(QueryDesc *queryDesc)
 	Relation      rel;
 	Gtt           gtt;
 	PlannedStmt *pstmt = (PlannedStmt *) queryDesc->plannedstmt;
-	ParseState *pstate = make_parsestate(NULL);
 
 	if (GttHashTable == NULL || !pstmt)
 		return false;
@@ -1089,6 +1088,8 @@ gtt_table_exists(QueryDesc *queryDesc)
 			/* Create the temporary table if it does not exists */
 			if (!gtt.created)
 			{
+				ParseState *pstate = make_parsestate(NULL);
+
 				elog(DEBUG1, "global temporary table does not exists create it: %s", gtt.relname);
 				/* Call create temporary table */
 				if ((gtt.temp_relid = create_temporary_table_internal(pstate, gtt.relid, gtt.preserved)) != InvalidOid)
@@ -1098,6 +1099,7 @@ gtt_table_exists(QueryDesc *queryDesc)
 					gtt.created = true;
 					GttHashTableDelete(gtt.relname);
 					GttHashTableInsert(gtt, gtt.relname);
+					free_parsestate(pstate);
 				}
 				else
 					elog(ERROR, "can not create global temporary table %s", gtt.relname);
