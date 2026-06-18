@@ -1,3 +1,18 @@
+Version 4.5 - June 18 2026
+
+This is a maintenance release to add support to PG v19 and fix issues reported
+by users since last release.
+
+  - Add support to PG v19.
+  - Fix -Wmissing-variable-declarations warnings by making globals static.
+    Thanks to Japin Li for the patch.
+  - Fix CI workflow.
+  - Add support to CREATE INDEX CONCURRENTLY ... Thanks to Haibo Yan
+    for the patch.
+  - Remove use of the registered relid of the relation. When restoring
+    pgtt_schema.pg_global_temp_tables from a dump it contains invalid Oid
+    for the relation. Thanks to sibowu-aws for the report.
+
 Version 4.4 - July 02 2025
 
 This is a maintenance release to fix a search_path error when using pg_dump.
