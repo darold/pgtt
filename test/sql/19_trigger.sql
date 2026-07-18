@@ -1,0 +1,71 @@
+----
+-- Regression test to Global Temporary Table implementation
+--
+-- Test that the triggers defined on a GTT are replicated on the
+-- temporary table created on the fly for the session, together with
+-- their enabled state.
+--
+-- See https://github.com/darold/pgtt/issues/52
+--
+----
+
+-- Trigger functions used by the triggers defined on the GTT
+CREATE FUNCTION t_copy() RETURNS trigger AS $$
+BEGIN
+  NEW.descr := NEW.a_code;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION t_stamp() RETURNS trigger AS $$
+BEGIN
+  NEW.descr := 'STAMPED';
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create a GTT and define two triggers on it
+CREATE /*GLOBAL*/ TEMPORARY TABLE t_glob_temptable1 (id integer, a_code character(3), descr text) ON COMMIT PRESERVE ROWS;
+
+CREATE TRIGGER t_copy_trg BEFORE INSERT ON pgtt_schema.t_glob_temptable1
+  FOR EACH ROW EXECUTE PROCEDURE t_copy();
+
+CREATE TRIGGER t_stamp_trg BEFORE INSERT ON pgtt_schema.t_glob_temptable1
+  FOR EACH ROW EXECUTE PROCEDURE t_stamp();
+
+-- Use a non default state for both triggers
+ALTER TABLE pgtt_schema.t_glob_temptable1 ENABLE ALWAYS TRIGGER t_copy_trg;
+ALTER TABLE pgtt_schema.t_glob_temptable1 DISABLE TRIGGER t_stamp_trg;
+
+-- The triggers are attached to the "template" table
+SELECT t.tgname, t.tgenabled FROM pg_trigger t JOIN pg_class c ON (c.oid = t.tgrelid) JOIN pg_namespace n ON (n.oid = c.relnamespace) WHERE c.relname = 't_glob_temptable1' AND n.nspname = 'pgtt_schema' AND NOT t.tgisinternal ORDER BY 1;
+
+-- The first insert creates the temporary table, the triggers must have been
+-- copied on it. Only the t_copy_trg trigger is enabled, descr must be set
+-- to the a_code value and not to the value set by the disabled trigger.
+INSERT INTO t_glob_temptable1 (id, a_code) VALUES (1, 'PQR');
+SELECT * FROM t_glob_temptable1;
+
+-- Both triggers must be present on the temporary table with the same state
+SELECT t.tgname, t.tgenabled FROM pg_trigger t JOIN pg_class c ON (c.oid = t.tgrelid) JOIN pg_namespace n ON (n.oid = c.relnamespace) WHERE c.relname = 't_glob_temptable1' AND n.nspname LIKE 'pg\_temp%' AND NOT t.tgisinternal ORDER BY 1;
+
+-- The "template" table must still be empty
+SET pgtt.enabled TO off;
+SELECT * FROM pgtt_schema.t_glob_temptable1;
+SET pgtt.enabled TO on;
+
+-- Reconnect, the temporary table is dropped and a new one must be
+-- created with the triggers as well
+\c - -
+
+INSERT INTO t_glob_temptable1 (id, a_code) VALUES (2, 'XYZ');
+SELECT * FROM t_glob_temptable1;
+
+SELECT t.tgname, t.tgenabled FROM pg_trigger t JOIN pg_class c ON (c.oid = t.tgrelid) JOIN pg_namespace n ON (n.oid = c.relnamespace) WHERE c.relname = 't_glob_temptable1' AND n.nspname LIKE 'pg\_temp%' AND NOT t.tgisinternal ORDER BY 1;
+
+-- Reconnect and cleanup
+\c - -
+
+DROP TABLE t_glob_temptable1;
+DROP FUNCTION t_copy();
+DROP FUNCTION t_stamp();
