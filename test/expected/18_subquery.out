@@ -1,0 +1,88 @@
+----
+-- Regression test to Global Temporary Table implementation
+--
+-- Test that a GTT referenced in a sub-query, a CTE or as a secondary
+-- FROM item is rerouted to the temporary table too, and not left
+-- pointing to the empty "template" table.
+--
+-- See https://github.com/darold/pgtt/issues/58
+--
+----
+-- Create a regular table and a GTT with a primary key
+CREATE TABLE t_regular (id integer PRIMARY KEY, lbl text);
+CREATE /*GLOBAL*/ TEMPORARY TABLE t_glob_temptable1 (id integer PRIMARY KEY, lbl text) ON COMMIT DELETE ROWS;
+-- The trigger replicates the rows of the regular table into the GTT
+-- using a NOT EXISTS sub-query on the GTT itself
+CREATE FUNCTION t_regular_trigger() RETURNS trigger AS $$
+BEGIN
+  INSERT INTO t_glob_temptable1 (id, lbl)
+  SELECT t.id, t.lbl
+  FROM   t_regular t
+  WHERE  NOT EXISTS ( SELECT 1
+                      FROM   t_glob_temptable1 g
+                      WHERE  g.id = t.id );
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER t_regular_trigger AFTER INSERT ON t_regular
+  FOR EACH STATEMENT EXECUTE PROCEDURE t_regular_trigger();
+BEGIN;
+-- Both inserts must succeed, the second call of the trigger must not
+-- try to insert again the row already stored in the temporary table
+INSERT INTO t_regular (id, lbl) VALUES (1, 'One');
+INSERT INTO t_regular (id, lbl) VALUES (2, 'Two');
+-- The GTT must contain the two rows
+SELECT * FROM t_glob_temptable1 ORDER BY id;
+ id | lbl 
+----+-----
+  1 | One
+  2 | Two
+(2 rows)
+
+-- The "template" table must still be empty
+SET pgtt.enabled TO off;
+SELECT * FROM pgtt_schema.t_glob_temptable1;
+ id | lbl 
+----+-----
+(0 rows)
+
+SET pgtt.enabled TO on;
+COMMIT;
+-- ON COMMIT DELETE ROWS, the GTT must be empty now
+SELECT count(*) FROM t_glob_temptable1;
+ count 
+-------
+     0
+(1 row)
+
+BEGIN;
+INSERT INTO t_glob_temptable1 VALUES (1, 'One'), (2, 'Two');
+-- GTT used as second FROM item
+SELECT g.id, g.lbl FROM t_regular r, t_glob_temptable1 g WHERE r.id = g.id ORDER BY 1;
+ id | lbl 
+----+-----
+  1 | One
+  2 | Two
+(2 rows)
+
+-- GTT used in a CTE
+WITH c AS (SELECT id, lbl FROM t_glob_temptable1) SELECT * FROM c ORDER BY id;
+ id | lbl 
+----+-----
+  1 | One
+  2 | Two
+(2 rows)
+
+-- GTT used in a scalar sub-query only, the top level range table is empty
+SELECT (SELECT count(*) FROM t_glob_temptable1);
+ count 
+-------
+     2
+(1 row)
+
+ROLLBACK;
+-- Reconnect and cleanup
+\c - -
+DROP TABLE t_regular;
+DROP FUNCTION t_regular_trigger();
+DROP TABLE t_glob_temptable1;

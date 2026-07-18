@@ -39,6 +39,7 @@
 #include "commands/comment.h"
 #include "executor/spi.h"
 #include "nodes/makefuncs.h"
+#include "nodes/nodeFuncs.h"
 #include "nodes/nodes.h"
 #include "nodes/pg_list.h"
 #include "nodes/print.h"
@@ -232,6 +233,9 @@ static bool gtt_check_command(GTT_PROCESSUTILITY_PROTO);
 static bool gtt_table_exists(QueryDesc *queryDesc);
 void exitHook(int code, Datum arg);
 static bool is_catalog_relid(Oid relid);
+static void gtt_rewrite_rte(ParseState *pstate, Query *query, RangeTblEntry *rte);
+static void gtt_rewrite_query(ParseState *pstate, Query *query);
+static bool gtt_query_walker(Node *node, void *context);
 static void force_pgtt_namespace (void);
 static void gtt_update_registered_table(Gtt gtt);
 int strremovestr(char *src, char *toremove);
@@ -1984,97 +1988,13 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query)
 	/* Try to load pgtt if not already done. */
 	gtt_try_load();
 
-	if (NOT_IN_PARALLEL_WORKER && pgtt_is_enabled && query->rtable != NIL &&
-		GttHashTable != NULL)
-	{
-		/* replace the Oid of the template table by our new table in the rtable */
-		RangeTblEntry *rte = (RangeTblEntry *) linitial(query->rtable);
-		Relation      rel;
-		Gtt           gtt;
-		char          *name = NULL;
-
-		/* This must be a valid relation not from pg_catalog*/
-		if (rte->relid != InvalidOid && rte->relkind == RELKIND_RELATION
-				&& !is_catalog_relid(rte->relid))
-		{
-#if (PG_VERSION_NUM >= 120000)
-			rel = table_open(rte->relid, NoLock);
-#else
-			rel = heap_open(rte->relid, NoLock);
-#endif
-			name = RelationGetRelationName(rel);
-#if (PG_VERSION_NUM >= 120000)
-			table_close(rel, NoLock);
-#else
-			heap_close(rel, NoLock);
-#endif
-
-			gtt.relid = 0;
-			gtt.temp_relid = 0;
-			gtt.relname[0] = '\0';
-			gtt.preserved = false;
-			gtt.code = NULL;
-			gtt.created = false;
-
-			/* Check if the table is in the hash list and it has not already be created */
-			if ((const void*)name != NULL)
-			{
-				elog(DEBUG1, "gtt_post_parse_analyze() looking for table \"%s\" with relid %d into cache.", name, rte->relid);
-				GttHashTableLookup(name, gtt);
-			}
-			else
-				elog(ERROR, "gtt_post_parse_analyze() table to search in cache is not valide pointer, relid: %d.", rte->relid);
-
-			if (gtt.relname[0] != '\0')
-			{
-				/* After an error and rollback the table is still registered in cache but must be initialized */
-				if (gtt.created && OidIsValid(gtt.temp_relid)
-						&& !SearchSysCacheExists1(RELOID, ObjectIdGetDatum(gtt.temp_relid))
-						)
-				{
-					elog(DEBUG1, "invalid temporary table with relid %d (%s), reseting.", gtt.temp_relid, gtt.relname);
-					gtt.created = false;
-					gtt.temp_relid = 0;
-				}
-				/* Create the temporary table if it does not exists */
-				if (!gtt.created)
-				{
-					elog(DEBUG1, "global temporary table from relid %d does not exists create it: %s", rte->relid, gtt.relname);
-					/* Call create temporary table */
-					if ((gtt.temp_relid = create_temporary_table_internal(pstate, gtt.relid, gtt.preserved)) != InvalidOid)
-					{
-						elog(DEBUG1, "global temporary table %s (oid: %d) created", gtt.relname, gtt.temp_relid);
-						/* Update hash list with table flagged as created*/
-						gtt.created = true;
-						GttHashTableDelete(gtt.relname);
-						GttHashTableInsert(gtt, gtt.relname);
-					}
-					else
-						elog(ERROR, "can not create global temporary table %s", gtt.relname);
-				}
-
-				elog(DEBUG1, "temporary table exists with oid %d", gtt.temp_relid);
-
-				if (rte->relid != gtt.temp_relid)
-				{
-#if PG_VERSION_NUM >= 160000
-					RTEPermissionInfo *rteperm = list_nth(query->rteperminfos,
-											rte->perminfoindex - 1);
-					rteperm->relid = gtt.temp_relid;
-#endif
-					LockRelationOid(gtt.temp_relid, rte->rellockmode);
-					if (rte->rellockmode != AccessShareLock)
-						UnlockRelationOid(rte->relid, rte->rellockmode);
-
-					rte->relid = gtt.temp_relid;
-					elog(DEBUG1, "rerouting relid %d access to %d for GTT table \"%s\"", rte->relid, gtt.temp_relid, name);
-				}
-			}
-			else
-				/* the table is not a global temporary table do nothing*/
-				elog(DEBUG1, "table \"%s\" not registered as GTT", name);
-		}
-	}
+	/*
+	 * Reroute all the references to a GTT "template" table found in the
+	 * query tree, including the ones in sub-queries, CTE and sub-links,
+	 * not just the first entry of the top level range table.
+	 */
+	if (NOT_IN_PARALLEL_WORKER && pgtt_is_enabled && GttHashTable != NULL)
+		gtt_rewrite_query(pstate, query);
 
 	/* restore hook */
 	if (prev_post_parse_analyze_hook) {
@@ -2084,6 +2004,155 @@ gtt_post_parse_analyze(ParseState *pstate, Query *query)
 		prev_post_parse_analyze_hook(pstate, query);
 #endif
 	}
+}
+
+/*
+ * Reroute a single range table entry to the temporary table backing the
+ * global temporary table, when the relation is a GTT "template" table.
+ * The temporary table is created on the fly if it does not exist yet.
+ */
+static void
+gtt_rewrite_rte(ParseState *pstate, Query *query, RangeTblEntry *rte)
+{
+	Relation      rel;
+	Gtt           gtt;
+	char          *name = NULL;
+
+	/* This must be a valid relation not from pg_catalog */
+	if (rte->rtekind != RTE_RELATION || rte->relid == InvalidOid
+			|| rte->relkind != RELKIND_RELATION
+			|| is_catalog_relid(rte->relid))
+		return;
+
+#if (PG_VERSION_NUM >= 120000)
+	rel = table_open(rte->relid, NoLock);
+#else
+	rel = heap_open(rte->relid, NoLock);
+#endif
+	name = RelationGetRelationName(rel);
+#if (PG_VERSION_NUM >= 120000)
+	table_close(rel, NoLock);
+#else
+	heap_close(rel, NoLock);
+#endif
+
+	gtt.relid = 0;
+	gtt.temp_relid = 0;
+	gtt.relname[0] = '\0';
+	gtt.preserved = false;
+	gtt.code = NULL;
+	gtt.created = false;
+
+	/* Check if the table is in the hash list and it has not already be created */
+	if ((const void*)name != NULL)
+	{
+		elog(DEBUG1, "gtt_rewrite_rte() looking for table \"%s\" with relid %d into cache.", name, rte->relid);
+		GttHashTableLookup(name, gtt);
+	}
+	else
+		elog(ERROR, "gtt_rewrite_rte() table to search in cache is not valide pointer, relid: %d.", rte->relid);
+
+	if (gtt.relname[0] == '\0')
+	{
+		/* the table is not a global temporary table do nothing*/
+		elog(DEBUG1, "table \"%s\" not registered as GTT", name);
+		return;
+	}
+
+	/* After an error and rollback the table is still registered in cache but must be initialized */
+	if (gtt.created && OidIsValid(gtt.temp_relid)
+			&& !SearchSysCacheExists1(RELOID, ObjectIdGetDatum(gtt.temp_relid))
+			)
+	{
+		elog(DEBUG1, "invalid temporary table with relid %d (%s), reseting.", gtt.temp_relid, gtt.relname);
+		gtt.created = false;
+		gtt.temp_relid = 0;
+	}
+
+	/* Create the temporary table if it does not exists */
+	if (!gtt.created)
+	{
+		elog(DEBUG1, "global temporary table from relid %d does not exists create it: %s", rte->relid, gtt.relname);
+		/* Call create temporary table */
+		if ((gtt.temp_relid = create_temporary_table_internal(pstate, gtt.relid, gtt.preserved)) != InvalidOid)
+		{
+			elog(DEBUG1, "global temporary table %s (oid: %d) created", gtt.relname, gtt.temp_relid);
+			/* Update hash list with table flagged as created*/
+			gtt.created = true;
+			GttHashTableDelete(gtt.relname);
+			GttHashTableInsert(gtt, gtt.relname);
+		}
+		else
+			elog(ERROR, "can not create global temporary table %s", gtt.relname);
+	}
+
+	elog(DEBUG1, "temporary table exists with oid %d", gtt.temp_relid);
+
+	if (rte->relid != gtt.temp_relid)
+	{
+#if PG_VERSION_NUM >= 160000
+		/*
+		 * Some RTE do not have any permission info attached, only fix the
+		 * relation Oid of the permission info when there is one.
+		 */
+		if (rte->perminfoindex > 0)
+		{
+			RTEPermissionInfo *rteperm = list_nth(query->rteperminfos,
+								rte->perminfoindex - 1);
+			rteperm->relid = gtt.temp_relid;
+		}
+#endif
+		LockRelationOid(gtt.temp_relid, rte->rellockmode);
+		if (rte->rellockmode != AccessShareLock)
+			UnlockRelationOid(rte->relid, rte->rellockmode);
+
+		elog(DEBUG1, "rerouting relid %d access to %d for GTT table \"%s\"", rte->relid, gtt.temp_relid, name);
+		rte->relid = gtt.temp_relid;
+	}
+}
+
+/*
+ * Reroute all the GTT "template" table references of a query and of all
+ * its sub-queries (sub-selects, sub-links, CTE, set operations, ...).
+ *
+ * The previous implementation was only looking at the first entry of the
+ * top level range table, so that a GTT referenced in a sub-query or in a
+ * secondary FROM item was still reading the empty "template" table. See
+ * https://github.com/darold/pgtt/issues/58
+ */
+static void
+gtt_rewrite_query(ParseState *pstate, Query *query)
+{
+	ListCell *lc;
+
+	if (query == NULL)
+		return;
+
+	foreach(lc, query->rtable)
+		gtt_rewrite_rte(pstate, query, (RangeTblEntry *) lfirst(lc));
+
+	/* Recurse into any sub-query of this query */
+	(void) query_tree_walker(query, gtt_query_walker, (void *) pstate, 0);
+}
+
+/*
+ * Expression tree walker used to find the sub-queries of a query.
+ * Utility statements are not walked by query_tree_walker().
+ */
+static bool
+gtt_query_walker(Node *node, void *context)
+{
+	if (node == NULL)
+		return false;
+
+	if (IsA(node, Query))
+	{
+		/* gtt_rewrite_query() takes care of the recursion by itself */
+		gtt_rewrite_query((ParseState *) context, (Query *) node);
+		return false;
+	}
+
+	return expression_tree_walker(node, gtt_query_walker, context);
 }
 
 static bool
