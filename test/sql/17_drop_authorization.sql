@@ -1,0 +1,55 @@
+----
+-- Regression test to Global Temporary Table implementation
+--
+-- Test that a role which is not the owner of a Global Temporary
+-- Table cannot deregister it (remove its row from
+-- pg_global_temp_tables) simply by issuing a DROP TABLE statement
+-- that names it, even when that role's backend hasn't cached the
+-- GTT locally yet and so takes the "not cached" lookup path.
+--
+-- Previously that path deleted the catalog row unconditionally,
+-- before PostgreSQL's own ownership check on the DROP TABLE
+-- statement itself ever ran.
+--
+----
+
+CREATE ROLE gtt_owner LOGIN;
+CREATE ROLE gtt_other LOGIN;
+GRANT ALL ON SCHEMA pgtt_schema TO gtt_owner;
+GRANT SELECT, INSERT, UPDATE, DELETE ON pgtt_schema.pg_global_temp_tables TO gtt_owner;
+GRANT USAGE ON SCHEMA pgtt_schema TO gtt_other;
+
+-- gtt_other connects first and runs an unrelated statement, so its
+-- backend's GTT cache gets initialized *before* the table below
+-- exists -- this is what forces the later DROP TABLE attempt onto
+-- the "not cached" lookup path rather than the ordinary cached path.
+\c - gtt_other
+SELECT 1;
+
+-- gtt_owner creates the GTT that gtt_other's cache predates.
+\c - gtt_owner
+CREATE /*GLOBAL*/ TEMPORARY TABLE t_drop_authorization (id integer, lbl text) ON COMMIT PRESERVE ROWS;
+
+-- gtt_other (same connection as above, stale cache, not the owner)
+-- must NOT be able to drop it.
+\c - gtt_other
+DROP TABLE t_drop_authorization;
+
+-- The registration must be completely unaffected by the rejected
+-- attempt above, and gtt_owner must still be able to use and drop it
+-- normally.
+\c - gtt_owner
+SELECT nspname, relname, preserved FROM pgtt_schema.pg_global_temp_tables WHERE relname = 't_drop_authorization';
+INSERT INTO t_drop_authorization VALUES (1, 'one');
+SELECT * FROM t_drop_authorization;
+
+-- Reconnect (same owner) before dropping, matching the project's
+-- existing convention that a GTT can only be dropped from a session
+-- that hasn't already materialized it.
+\c - gtt_owner
+DROP TABLE t_drop_authorization;
+
+-- Cleanup
+\c - -
+DROP ROLE gtt_owner;
+DROP ROLE gtt_other;

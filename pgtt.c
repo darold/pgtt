@@ -51,6 +51,7 @@
 #include "storage/lmgr.h"
 #include "storage/proc.h"
 #include "tcop/utility.h"
+#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/formatting.h"
@@ -154,7 +155,6 @@ static bool pgtt_is_enabled = true;
 
 /* Regular expression search */
 #define CREATE_GLOBAL_REGEXP "^\\s*CREATE\\s+(?:\\/\\*\\s*)?GLOBAL(?:\\s*\\*\\/)?"
-#define CREATE_WITH_FK_REGEXP "\\s*FOREIGN\\s+KEY"
 
 /* Oid and name of pgtt extrension schema in the database */
 static Oid pgtt_namespace_oid = InvalidOid;
@@ -210,7 +210,7 @@ do { \
         if (found) \
                 elog(ERROR, "duplicate GTT name"); \
         hentry->gtt = GTT; \
-        strcpy(hentry->name, NAME); \
+        strlcpy(hentry->name, NAME, sizeof(hentry->name)); \
 	elog(DEBUG1, "Insert GTT entry in HTAB, key: %s, relid: %d, temp_relid: %d, created: %d", hentry->gtt.relname, hentry->gtt.relid, hentry->gtt.temp_relid, hentry->gtt.created); \
 } while(0)
 
@@ -236,6 +236,8 @@ static void force_pgtt_namespace (void);
 static void gtt_update_registered_table(Gtt gtt);
 int strremovestr(char *src, char *toremove);
 static void gtt_unregister_gtt_not_cached(const char *relname);
+static bool gtt_tableelts_has_foreign_key(List *tableElts);
+static bool gtt_current_user_can_drop(Oid relid);
 
 /*
  * Module load callback
@@ -374,6 +376,78 @@ gtt_ProcessUtility(GTT_PROCESSUTILITY_PROTO)
 	PG_END_TRY();
 
 	elog(DEBUG1, "End of gtt_ProcessUtility()");
+}
+
+/*
+ * Walk a CREATE TABLE statement's column/constraint list looking for a
+ * foreign key constraint, in either the table-level
+ * "FOREIGN KEY (...) REFERENCES ..." form (a bare Constraint node in
+ * tableElts) or the column-level "col type REFERENCES ..." form (a
+ * Constraint node attached to a ColumnDef's own constraint list).
+ * Replaces a previous text-regex search for the literal substring
+ * "FOREIGN KEY", which only caught the table-level form.
+ */
+static bool
+gtt_tableelts_has_foreign_key(List *tableElts)
+{
+	ListCell *lc;
+
+	foreach(lc, tableElts)
+	{
+		Node *elt = (Node *) lfirst(lc);
+
+		if (IsA(elt, Constraint))
+		{
+			Constraint *constr = (Constraint *) elt;
+
+			if (constr->contype == CONSTR_FOREIGN)
+				return true;
+		}
+		else if (IsA(elt, ColumnDef))
+		{
+			ColumnDef *coldef = (ColumnDef *) elt;
+			ListCell  *lc2;
+
+			foreach(lc2, coldef->constraints)
+			{
+				Constraint *constr = (Constraint *) lfirst(lc2);
+
+				if (IsA(constr, Constraint) && constr->contype == CONSTR_FOREIGN)
+					return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+/*
+ * Return true if the current user is allowed to DROP the given
+ * relation (its owner, a role that inherits ownership rights, or a
+ * superuser). Used before pgtt mutates the shared pg_global_temp_tables
+ * catalog on behalf of a DROP TABLE statement that targets a relation
+ * this backend hasn't cached locally, so that an unprivileged role
+ * cannot deregister another user's Global Temporary Table simply by
+ * naming it in a DROP TABLE statement that will itself go on to fail
+ * PostgreSQL's own ownership check.
+ */
+static bool
+gtt_current_user_can_drop(Oid relid)
+{
+	if (!OidIsValid(relid))
+		return false;
+
+	/*
+	 * PostgreSQL 16 replaced the whole family of per-catalog
+	 * pg_*_ownercheck() functions (including pg_class_ownercheck())
+	 * with a single generic object_ownercheck(classid, objectid,
+	 * roleid). Both are declared in utils/acl.h.
+	 */
+#if PG_VERSION_NUM >= 160000
+	return object_ownercheck(RelationRelationId, relid, GetUserId());
+#else
+	return pg_class_ownercheck(relid, GetUserId());
+#endif
 }
 
 /*
@@ -537,8 +611,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			 */
 			gtt.relid = 0;
 			gtt.temp_relid = 0;
-			strcpy(gtt.relname, name);
-			gtt.relname[strlen(name)] = 0;
+			strlcpy(gtt.relname, name, sizeof(gtt.relname));
 			gtt.preserved = preserved;
 			gtt.created = false;
 			/* Extract the AS ... code part from the query */
@@ -602,15 +675,18 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			if (!regexec_result)
 				break;
 
-			/* Check if there is foreign key defined in the statement */
-			regexec_result = RE_compile_and_execute(
-					cstring_to_text(CREATE_WITH_FK_REGEXP),
-					VARDATA_ANY(cstring_to_text((char *) queryString)),
-					VARSIZE_ANY_EXHDR(cstring_to_text((char *) queryString)),
-					REG_ADVANCED | REG_ICASE | REG_NEWLINE,
-					DEFAULT_COLLATION_OID,
-					0, NULL);
-			if (regexec_result)
+			/*
+			 * Check if there is a foreign key defined in the statement.
+			 * A text-regex search for the literal substring "FOREIGN KEY"
+			 * only catches the table-level "FOREIGN KEY (...) REFERENCES
+			 * ..." form; it misses the equally valid column-level
+			 * "col type REFERENCES ..." form, which contains no such
+			 * substring at all and would silently slip through. Inspect
+			 * the parsed column/constraint list instead so both forms
+			 * are caught, matching how the ALTER TABLE handler below
+			 * already checks parsed Constraint nodes rather than text.
+			 */
+			if (gtt_tableelts_has_foreign_key(stmt->tableElts))
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 						 errmsg("attempt to create referential integrity constraint on global temporary table")));
@@ -652,8 +728,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			/* Create the Global Temporary Table template and register the table */
 			gtt.relid = 0;
 			gtt.temp_relid = 0;
-			strcpy(gtt.relname, name);
-			gtt.relname[strlen(name)] = 0;
+			strlcpy(gtt.relname, name, sizeof(gtt.relname));
 			gtt.preserved = preserved;
 			gtt.created = false;
 			gtt.code = NULL;
@@ -856,7 +931,7 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			RenameRelation(stmt);
 
 			elog(DEBUG1, "updating registered table in %s.pg_global_temp_tables.", pgtt_namespace_name);
-			strcpy(gtt.relname, stmt->newname);
+			strlcpy(gtt.relname, stmt->newname, sizeof(gtt.relname));
 			gtt_update_registered_table(gtt);
 
 			/* Delete and recreate the table in cache */
@@ -1220,9 +1295,9 @@ gtt_create_table_statement(Gtt gtt)
 		ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 	/* Get Oid of the newly created table */
-	newQueryString = psprintf("SELECT c.relfilenode FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE c.relname='%s' AND n.nspname = '%s'",
-			gtt.relname,
-			pgtt_namespace_name);
+	newQueryString = psprintf("SELECT c.relfilenode FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE c.relname=%s AND n.nspname = %s",
+			quote_literal_cstr(gtt.relname),
+			quote_literal_cstr(pgtt_namespace_name));
 
 	result = SPI_exec(newQueryString, 0);
 	if (result != SPI_OK_SELECT && SPI_processed != 1)
@@ -1239,11 +1314,11 @@ gtt_create_table_statement(Gtt gtt)
 							quote_identifier(gtt.relname))));
 
 	/* Now register the GTT table */
-	newQueryString = psprintf("INSERT INTO %s.pg_global_temp_tables VALUES (%d, '%s', '%s', '%c', %s)",
+	newQueryString = psprintf("INSERT INTO %s.pg_global_temp_tables VALUES (%d, %s, %s, '%c', %s)",
 			quote_identifier(pgtt_namespace_name),
 			gttOid,
-			pgtt_namespace_name,
-			gtt.relname,
+			quote_literal_cstr(pgtt_namespace_name),
+			quote_literal_cstr(gtt.relname),
 			(gtt.preserved) ? 't' : 'f',
 			quote_literal_cstr(gtt.code)
 		);
@@ -1251,8 +1326,15 @@ gtt_create_table_statement(Gtt gtt)
 	if (result < 0)
 		ereport(ERROR, (errmsg("can not registrer new global temporary table")));
 
-	/* Set privilege on the unlogged table */
-	newQueryString = psprintf("GRANT ALL ON TABLE %s.%s TO public",
+	/*
+	 * Set privilege on the unlogged table. Only SELECT is granted to
+	 * PUBLIC here (previously ALL was granted, which let any role
+	 * INSERT/UPDATE/DELETE/TRUNCATE data in this table, and attach
+	 * triggers to it, regardless of ownership). SELECT is kept so the
+	 * documented "SET pgtt.enabled TO off; SELECT * FROM <schema>.<t>"
+	 * diagnostic pattern keeps working for any role.
+	 */
+	newQueryString = psprintf("GRANT SELECT ON TABLE %s.%s TO public",
 			quote_identifier(pgtt_namespace_name),
 			quote_identifier(gtt.relname));
 	result = SPI_exec(newQueryString, 0);
@@ -1339,9 +1421,33 @@ gtt_unregister_gtt_not_cached(const char *relname)
 
 	/* Start search of relation */
 	scan = systable_beginscan(rel, 0, true, NULL, 1, key);
-	/* Remove the tuples. */
+	/*
+	 * Remove the tuples, but only those the current user is actually
+	 * allowed to drop. Previously this deleted any matching row
+	 * unconditionally, before PostgreSQL's own ownership check on the
+	 * subsequent DROP TABLE ever ran -- letting any authenticated role
+	 * deregister another user's Global Temporary Table simply by
+	 * naming it in a DROP TABLE statement, even though that statement
+	 * would itself go on to fail with a permission error.
+	 */
 	while (HeapTupleIsValid(tuple = systable_getnext(scan)))
 	{
+		bool  isnull;
+		Datum relidDatum = heap_getattr(tuple, Anum_pgtt_relid, RelationGetDescr(rel), &isnull);
+
+		if (isnull || !gtt_current_user_can_drop(DatumGetInt32(relidDatum)))
+		{
+			systable_endscan(scan);
+#if (PG_VERSION_NUM >= 120000)
+			table_close(rel, RowExclusiveLock);
+#else
+			heap_close(rel, RowExclusiveLock);
+#endif
+			ereport(ERROR,
+					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+					 errmsg("must be owner of Global Temporary Table \"%s\" to drop it", relname)));
+		}
+
 		elog(DEBUG1, "removing tuple with relname = %s", relname);
 		simple_heap_delete(rel, &tuple->t_self);
 	}
@@ -1492,7 +1598,7 @@ EnableGttManager(void)
 	 * Set the OID and name of the extension schema, all objects will be
 	 * created in this schema.
 	 */
-	strcpy(pgtt_namespace_name, nspname);
+	strlcpy(pgtt_namespace_name, nspname, sizeof(pgtt_namespace_name));
 
 	return true;
 }
@@ -1595,7 +1701,7 @@ gtt_load_global_temporary_tables(void)
 
 		/* Extract data */
 		heap_deform_tuple(tuple, tupleDesc, values, isnull);
-		strcpy(gtt.relname, NameStr(*(DatumGetName(values[2]))));
+		strlcpy(gtt.relname, NameStr(*(DatumGetName(values[2]))), sizeof(gtt.relname));
 		gtt.preserved = DatumGetBool(values[3]);
 		gtt.code = TextDatumGetCString(values[4]);
 		gtt.created = false;
@@ -2085,9 +2191,9 @@ gtt_update_registered_table(Gtt gtt)
 	if (connected != SPI_OK_CONNECT)
 		ereport(ERROR, (errmsg("could not connect to SPI manager")));
 
-	newQueryString = psprintf("UPDATE %s.pg_global_temp_tables SET relname = '%s' WHERE relid = %d",
+	newQueryString = psprintf("UPDATE %s.pg_global_temp_tables SET relname = %s WHERE relid = %d",
 			quote_identifier(pgtt_namespace_name),
-			gtt.relname,
+			quote_literal_cstr(gtt.relname),
 			gtt.relid
 		);
 	result = SPI_exec(newQueryString, 0);
@@ -2136,9 +2242,9 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 		ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 	/* Get Oid of the newly created table */
-	newQueryString = psprintf("SELECT c.relfilenode FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE c.relname='%s' AND n.nspname = '%s'",
-			gtt.relname,
-			pgtt_namespace_name);
+	newQueryString = psprintf("SELECT c.relfilenode FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE c.relname=%s AND n.nspname = %s",
+			quote_literal_cstr(gtt.relname),
+			quote_literal_cstr(pgtt_namespace_name));
 
 	result = SPI_exec(newQueryString, 0);
 	if (result != SPI_OK_SELECT && SPI_processed != 1)
@@ -2178,9 +2284,9 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 			ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 		/* Get Oid of the newly created temporary table */
-		newQueryString = psprintf("SELECT c.relfilenode FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE c.relname='%s' AND n.nspname = '%s'",
-				gtt.relname,
-				namespaceName);
+		newQueryString = psprintf("SELECT c.relfilenode FROM pg_class c JOIN pg_namespace n ON (c.relnamespace=n.oid) WHERE c.relname=%s AND n.nspname = %s",
+				quote_literal_cstr(gtt.relname),
+				quote_literal_cstr(namespaceName));
 
 		result = SPI_exec(newQueryString, 0);
 		if (result != SPI_OK_SELECT && SPI_processed != 1)
@@ -2199,11 +2305,11 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 	}
 
 	/* Now register the GTT table */
-	newQueryString = psprintf("INSERT INTO %s.pg_global_temp_tables VALUES (%d, '%s', '%s', '%c', %s)",
+	newQueryString = psprintf("INSERT INTO %s.pg_global_temp_tables VALUES (%d, %s, %s, '%c', %s)",
 			quote_identifier(pgtt_namespace_name),
 			gtt.relid,
-			pgtt_namespace_name,
-			gtt.relname,
+			quote_literal_cstr(pgtt_namespace_name),
+			quote_literal_cstr(gtt.relname),
 			(gtt.preserved) ? 't' : 'f',
 			quote_literal_cstr(gtt.code)
 		);
