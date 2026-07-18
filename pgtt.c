@@ -1813,7 +1813,12 @@ gtt_copy_triggers(Oid parent_relid, const char *relname)
 		trigoid = HeapTupleGetOid(tuple);
 #endif
 
+#if (PG_VERSION_NUM >= 120000)
+#if (PG_VERSION_NUM < 140000)
+		def = OidFunctionCall1(F_PG_GET_TRIGGERDEF, ObjectIdGetDatum(trigoid));
+#else
 		def = OidFunctionCall1(F_PG_GET_TRIGGERDEF_OID, ObjectIdGetDatum(trigoid));
+#endif
 
 		trigdef = (GttTriggerDef *) palloc0(sizeof(GttTriggerDef));
 		trigdef->def = TextDatumGetCString(def);
