@@ -1,3 +1,97 @@
+Version 4.6 - July 19 2026
+
+This is a maintenance release ro fix several security and triggers or foreign
+keys related issues.
+
+  - Copy on the temporary table the triggers defined on the "template"
+    table of a global temporary table.
+    
+    CREATE TABLE ... (LIKE ...) has no INCLUDING TRIGGERS option in
+    PostgreSQL, so the triggers must be replicated by hand once the
+    temporary table has been created. The definition of each trigger is
+    obtained through pg_get_triggerdef(), parsed back, and the relation
+    of the resulting CreateTrigStmt is changed to point to the temporary
+    table before being executed.
+
+  - Fix duplicate key violation when trigger populates pgtt table. Thanks
+    to Adrian Billington for the report.
+
+  - Security hardening: lock down PUBLIC grants, fix possible SQL injection,
+    close FK/DROP gaps. Thanks to Devrim Gunduz for the patch.
+    * pg_global_temp_tables catalog table: no longer grants ALL to
+      PUBLIC (every install script since 2.0.0 did). Any authenticated
+      role could previously INSERT/UPDATE/DELETE/TRUNCATE another
+      user's GTT registration directly, bypassing every ownership check
+      the extension performs on CREATE/DROP/RENAME TABLE, and could
+      enumerate every GTT's full DDL across the whole database. PUBLIC
+      now gets SELECT only; roles that create/rename/drop GTTs need an
+      additional explicit GRANT on this table (documented in the new
+      install/upgrade scripts).
+    * gtt_create_table_statement(): per-GTT "template" tables are now
+      granted SELECT to PUBLIC instead of ALL, removing the ability for
+      arbitrary roles to write to, truncate, or attach triggers to a
+      table they do not own.
+    * Fixed SQL injection (CWE-89): six internally generated SPI
+      queries interpolated the user-supplied table name directly into
+      single-quoted string literals without escaping, while adjacent
+      code in the same functions correctly used quote_literal_cstr()
+      for other values. A table name containing an embedded quote
+      (e.g. a double-quoted identifier) could break out of the literal
+      and inject additional SQL, executed with the caller's privileges
+      -- or with a SECURITY DEFINER function's elevated privileges, if
+      such a function builds a GTT name dynamically from caller input.
+      All six call sites now consistently use quote_literal_cstr().
+    * Fixed missing-authorization check (CWE-862) in the DROP TABLE
+      path: when a dropped table isn't in the current backend's local
+      GTT cache, pgtt now checks pg_class ownership of the underlying
+      relation before deleting its pg_global_temp_tables row, instead
+      of deleting it unconditionally and relying on the *subsequent*
+      DROP TABLE's own permission check (and transaction abort) to
+      undo the side effect after the fact.
+    * Replaced the regex-based foreign-key rejection with inspection
+      of the parsed statement: the previous check searched the raw
+      query text for the literal substring "FOREIGN KEY", which missed
+      the equally valid column-level "col type REFERENCES ..." syntax
+      entirely (it contains no such substring). The new
+      gtt_tableelts_has_foreign_key() walks the parsed CreateStmt's
+      columns/constraints directly, matching the approach already used
+      by the ALTER TABLE handler.
+    * Replaced five unchecked strcpy() calls into fixed NAMEDATALEN
+      buffers (gtt.relname, pgtt_namespace_name) and one inside the
+      GttHashTableInsert macro with bounds-checked strlcpy(). Not
+      currently reachable as an overflow (PostgreSQL truncates
+      identifiers before they reach this code), but removes reliance
+      on that as the only safety net.
+
+  - Build failure on PostgreSQL 16 and later: pg_class_ownercheck()
+    was removed in PG16, which replaced the entire family of
+    per-catalog pg_*_ownercheck() functions with a single generic
+    object_ownercheck(classid, objectid, roleid) (both declared in
+    utils/acl.h). Thanks to Devrim Gunduz for the patch.
+
+  - Add security regression tests. Thanks to Devrim Gunduz for the patch.
+    * test/sql/15_security_grants.sql -- proves PUBLIC now has SELECT
+      only (not ALL) on pgtt_schema.pg_global_temp_tables and on a
+      GTT's template table: an unprivileged role can still read both,
+      but every INSERT/UPDATE/DELETE/TRUNCATE against them is rejected.
+      Also proves a role provisioned per the documented non-superuser
+      setup (schema CREATE + the new required table-level grant) can
+      still fully create, use, and drop a GTT end to end.
+    * test/sql/16_sql_injection.sql -- creates, renames, and uses a GTT
+      whose name is a double-quoted identifier containing an embedded
+      single quote and a complete extra SQL statement.
+    * test/sql/17_drop_authorization.sql -- has a non-owner role whose
+      backend cache predates a GTT's creation attempt to DROP TABLE it;
+      the drop must be rejected and the registration must survive
+      intact. This specifically exercises the "not cached" lookup path
+      in the DROP TABLE handler, where the missing ownership check
+      lived.
+    * test/sql/10_foreignkey.sql -- adds the column-level
+      "c1 integer REFERENCES other(id)" form alongside the existing
+      table-level "FOREIGN KEY (c1) REFERENCES other(id)" cases, both
+      directly in CREATE and added later via ALTER TABLE, and confirms
+      it is still allowed on an ordinary (non-GTT) table.
+
 Version 4.5 - June 18 2026
 
 This is a maintenance release to add support to PG v19 and fix issues reported
