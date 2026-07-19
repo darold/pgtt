@@ -65,3 +65,8 @@ SET pgtt.enabled TO on;
 SELECT * FROM t_security_grants;
 SELECT nspname, relname, preserved FROM pgtt_schema.pg_global_temp_tables WHERE relname = 't_security_grants';
 
+
+-- Cleanup. Reconnect first, a GTT can only be dropped from a session
+-- that has not already materialized it.
+\c - gtt_owner
+DROP TABLE t_security_grants;

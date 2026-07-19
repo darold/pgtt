@@ -288,15 +288,32 @@ _PG_init(void)
 							NULL);
 
 	/*
-	 * Immediately try to load the extension.  This will probably be a no-op in
-	 * the recommended "session_preload_libraries = 'pgtt'" configuration, as
-	 * it will happen outside of a transaction, but if the extension is
-	 * explicitly loaded with a plain LOAD command then the search_path would
-	 * only be changed after the next command is executed.  It means that the
-	 * very first query executed after such a LOAD wouldn't see the global
-	 * temporary tables.
+	 * Immediately try to load the extension.
+	 *
+	 * The GTT "template" tables are resolved through the search_path, which
+	 * is only fixed by force_pgtt_namespace() once the extension has been
+	 * loaded.  This must therefore be done before the very first command of
+	 * the session goes through parse analysis, otherwise that command fails
+	 * with "relation ... does not exist" when it references a GTT.
+	 *
+	 * With PostgreSQL 15 and above, process_session_preload_libraries() is
+	 * called from InitPostgres(), inside the transaction started for the
+	 * backend initialization, so gtt_try_load() can do its catalog lookups
+	 * right away.  With PostgreSQL 14 and below the session preloaded
+	 * libraries are loaded later, from PostgresMain(), after that transaction
+	 * has been committed: gtt_try_load() would be a no-op there because
+	 * IsTransactionState() returns false.  Start a transaction ourselves in
+	 * this case.  The same applies when the library is loaded through a plain
+	 * LOAD command outside of any transaction.
 	 */
-	gtt_try_load();
+	if (IsTransactionState())
+		gtt_try_load();
+	else if (IsUnderPostmaster && OidIsValid(MyDatabaseId))
+	{
+		StartTransactionCommand();
+		gtt_try_load();
+		CommitTransactionCommand();
+	}
 
 	/*
 	 * Install hooks.

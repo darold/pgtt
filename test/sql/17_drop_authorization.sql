@@ -13,6 +13,10 @@
 --
 ----
 
+-- Remember the user pg_regress connected with, the cleanup at the end of
+-- this file must be run as this user and not as one of the test roles.
+\set orig_user :USER
+
 GRANT ALL ON SCHEMA pgtt_schema TO gtt_owner;
 GRANT SELECT, INSERT, UPDATE, DELETE ON pgtt_schema.pg_global_temp_tables TO gtt_owner;
 GRANT USAGE ON SCHEMA pgtt_schema TO gtt_other;
@@ -47,3 +51,12 @@ SELECT * FROM t_drop_authorization;
 \c - gtt_owner
 DROP TABLE t_drop_authorization;
 
+-- Cleanup the roles created by 15_security_grants. Roles are cluster wide
+-- objects and pg_regress only drops and recreates the regression database,
+-- so leaving them behind makes any further run of the test suite on the
+-- same instance fail with "role already exists".
+\c - :orig_user
+REVOKE ALL ON SCHEMA pgtt_schema FROM gtt_owner, gtt_other;
+REVOKE ALL ON pgtt_schema.pg_global_temp_tables FROM gtt_owner;
+DROP ROLE gtt_owner;
+DROP ROLE gtt_other;
