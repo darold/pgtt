@@ -52,6 +52,15 @@ jobs:
 
     - name: config
       run: |
+        HBA=/etc/postgresql/$PGVERSION/main/pg_hba.conf
+        sudo tee $HBA > /dev/null <<'EOF'
+        local   all             all                                     trust
+        host    all             all             127.0.0.1/32            trust
+        host    all             all             ::1/128                 trust
+        local   replication     all                                     trust
+        host    replication     all             127.0.0.1/32            trust
+        host    replication     all             ::1/128                 trust
+        EOF
         sudo pg_conftool $PGVERSION main set session_preload_libraries pgtt
         sudo service postgresql restart
 
