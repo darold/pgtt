@@ -283,6 +283,10 @@ PostgreSQL do not allow partition on temporary table but because other RDBMS
 like Oracle, DB2 and MySQL do not support it. SQL Server supports partition
 on global temporary table.
 
+#### Triggers
+
+Triggers defined on or using a Global Temporary Table are supported since version 4.6.
+
 
 ### [How the extension really works](#how-the-extension-really-works)
 
