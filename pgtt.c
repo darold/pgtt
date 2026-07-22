@@ -538,6 +538,12 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 				/* append the extension schema to the arg list. */
 				if (!found)
 				{
+#if PG_VERSION_NUM >= 140000
+					/* Deep-copy args list if statement is marked read-only (cached plan) */
+					if (readOnlyTree)
+						stmt->args = (List *) copyObject(stmt->args);
+#endif
+
 					A_Const *newcon = makeNode(A_Const);
 					char *str = (char *) get_namespace_name(pgtt_namespace_oid);
 
