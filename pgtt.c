@@ -155,6 +155,8 @@ static bool is_declared_gtt(Oid relid);
 
 /* Enable use of Global Temporary Table at session level */
 static bool pgtt_is_enabled = true;
+static GucStringCheckHook prev_check_search_path = NULL;
+static bool pgtt_check_search_path(char **newval, void **extra, GucSource source);
 
 /* Regular expression search */
 #define CREATE_GLOBAL_REGEXP "^\\s*CREATE\\s+(?:\\/\\*\\s*)?GLOBAL(?:\\s*\\*\\/)?"
@@ -248,6 +250,23 @@ static void gtt_unregister_gtt_not_cached(const char *relname);
 static bool gtt_tableelts_has_foreign_key(List *tableElts);
 static bool gtt_current_user_can_drop(Oid relid);
 
+
+static struct config_string *
+get_guc_string_config(const char *name)
+{
+	struct config_generic **guc_vars = get_guc_variables();
+	int num_vars = GetNumConfigOptions();
+	int i;
+
+	for (i = 0; i < num_vars; i++)
+	{
+		if (guc_vars[i]->vartype == PGC_STRING &&
+			strcmp(guc_vars[i]->name, name) == 0)
+			return (struct config_string *) guc_vars[i];
+	}
+	return NULL;
+}
+
 /*
  * Module load callback
  */
@@ -326,6 +345,14 @@ _PG_init(void)
 	prev_ProcessUtility = ProcessUtility_hook;
 	ProcessUtility_hook = gtt_ProcessUtility;
 
+		/* Hook into search_path GUC check_hook */
+	struct config_string *conf = get_guc_string_config("search_path");
+	if (conf)
+	{
+		prev_check_search_path = conf->check_hook;
+		conf->check_hook = pgtt_check_search_path;
+	}
+
 	/* set the exit hook */
 	on_proc_exit(&exitHook, PointerGetDatum(NULL));
 }
@@ -342,6 +369,12 @@ _PG_fini(void)
 	ExecutorStart_hook = prev_ExecutorStart;
 	post_parse_analyze_hook = prev_post_parse_analyze_hook;
 	ProcessUtility_hook = prev_ProcessUtility;
+	/* Uninstall GUC check_hook */
+	struct config_string *conf_uninstall = get_guc_string_config("search_path");
+	if (conf_uninstall && conf_uninstall->check_hook == pgtt_check_search_path)
+	{
+		conf_uninstall->check_hook = prev_check_search_path;
+	}
 }
 
 /*
