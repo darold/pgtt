@@ -356,7 +356,55 @@ exitHook(int code, Datum arg)
 static void
 gtt_ProcessUtility(GTT_PROCESSUTILITY_PROTO)
 {
+#if PG_VERSION_NUM < 140000 && PG_VERSION_NUM >= 100000
+	/*
+	 * PostgreSQL 10 to 13: ProcessUtility hook signature receives a PlannedStmt wrapper.
+	 * Extract the underlying utility parsetree Node from pstmt->utilityStmt.
+	 */
+	Node *parsetree = (pstmt != NULL) ? pstmt->utilityStmt : NULL;
+#endif
+
 	elog(DEBUG1, "gtt_ProcessUtility()");
+
+#if PG_VERSION_NUM >= 140000
+	/*
+	 * PostgreSQL 14+: The ProcessUtility hook receives an explicit 'readOnlyTree' boolean flag from core.
+	 * If readOnlyTree is true (e.g. cached execution plan or PL/pgSQL function), the AST node is read-only
+	 * and cannot be mutated in place. We deep-copy the entire PlannedStmt wrapper in short-lived memory context
+	 * (CurrentMemoryContext) and set readOnlyTree = false so downstream PostgreSQL handlers know the AST is writable.
+	 */
+	if (readOnlyTree)
+	{
+		pstmt = copyObject(pstmt);
+		readOnlyTree = false;
+	}
+#else
+	/*
+	 * PostgreSQL < 14: The 'readOnlyTree' boolean parameter is not provided by PostgreSQL core.
+	 * To avoid unnecessary performance overhead of deep-copying all utility statements, perform a targeted
+	 * deep-copy ONLY when handling GUC SET search_path commands (VariableSetStmt).
+	 */
+	if (parsetree && IsA(parsetree, VariableSetStmt))
+	{
+		VariableSetStmt *stmt = (VariableSetStmt *) parsetree;
+		if (stmt && stmt->kind == VAR_SET_VALUE && stmt->name != NULL && pg_strcasecmp(stmt->name, "search_path") == 0)
+		{
+#if PG_VERSION_NUM >= 100000
+			/*
+			 * PostgreSQL 10 to 13: ProcessUtility hook operates on a PlannedStmt wrapper.
+			 * Deep-copy the top-level PlannedStmt structure to isolate session plan context memory.
+			 */
+			pstmt = copyObject(pstmt);
+#else
+			/*
+			 * PostgreSQL < 10 (e.g. PG 9.x): ProcessUtility hook operates directly on the raw parsetree Node.
+			 * Deep-copy the raw parsetree Node directly.
+			 */
+			parsetree = copyObject(parsetree);
+#endif
+		}
+	}
+#endif
 
 	/* Do not waste time here if the feature is not enabled for this session */
 	if (pgtt_is_enabled && NOT_IN_PARALLEL_WORKER)

@@ -38,3 +38,26 @@ SHOW search_path;
 -- Test empty search path like set by pg_dump
 SELECT pg_catalog.set_config('search_path', '', false);
 SHOW search_path;
+
+SET search_path = public;
+
+-- Test repeated SET search_path inside PL/pgSQL with memory pressure.
+-- Verifies that search_path modification does not corrupt cached plans.
+CREATE OR REPLACE FUNCTION test_searchpath_repeated() RETURNS void AS $$
+BEGIN
+    FOR i IN 1..100 LOOP
+        SET SEARCH_PATH = public;
+        SET Search_Path = public;
+        PERFORM decode(repeat('00', 1024), 'hex');
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT test_searchpath_repeated();
+
+-- Verify search_path still contains pgtt_schema after repeated SET
+SHOW search_path;
+
+-- Cleanup
+DROP FUNCTION test_searchpath_repeated();
+RESET search_path;
