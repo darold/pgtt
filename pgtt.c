@@ -242,6 +242,9 @@ static void gtt_exec_utility_subcommand(Node *stmt, const char *querystring);
 static void gtt_copy_triggers(Oid parent_relid, const char *relname);
 static void gtt_set_trigger_enabled(const char *relname, const char *tgname, char tgenabled);
 static void force_pgtt_namespace (void);
+#if PG_VERSION_NUM < 140000
+static bool gtt_stmt_is_rewritten(Node *parsetree);
+#endif
 static void gtt_update_registered_table(Gtt gtt);
 int strremovestr(char *src, char *toremove);
 static void gtt_unregister_gtt_not_cached(const char *relname);
@@ -371,6 +374,39 @@ gtt_ProcessUtility(GTT_PROCESSUTILITY_PROTO)
 		force_pgtt_namespace();
 
 		/*
+		 * gtt_check_command() rewrites the parse tree of some statements
+		 * (SET search_path and CREATE GLOBAL TEMPORARY TABLE ... AS).
+		 * The tree we receive here can belong to a cached plan, in which
+		 * case it must be considered read only: it is reused as is at the
+		 * next execution of the same statement.  This is what happens for
+		 * any statement executed inside a PL/pgSQL function.  Everything
+		 * we would add to such a tree is allocated in a memory context
+		 * that is reset at the end of the statement, so the next execution
+		 * would read already freed memory.  Work on our own copy of the
+		 * tree instead.
+		 *
+		 * Since PostgreSQL 14 the caller tells us through readOnlyTree
+		 * whether the tree may be modified.  When it may not, we just take
+		 * over the copy that standard_ProcessUtility() would have done
+		 * anyway and clear the flag, so this costs nothing.  On previous
+		 * versions there is no such flag and we copy the tree ourselves,
+		 * but only for the statements that we can rewrite.
+		 */
+#if PG_VERSION_NUM >= 140000
+		if (readOnlyTree)
+		{
+			pstmt = copyObject(pstmt);
+			readOnlyTree = false;
+		}
+#elif PG_VERSION_NUM >= 100000
+		if (gtt_stmt_is_rewritten(pstmt->utilityStmt))
+			pstmt = copyObject(pstmt);
+#else
+		if (gtt_stmt_is_rewritten(parsetree))
+			parsetree = copyObject(parsetree);
+#endif
+
+		/*
 		 * Check if we have a CREATE GLOBAL TEMPORARY TABLE
 		 * in this case do more work than the simple table
 		 * creation see SQL file in sql/ subdirectory.
@@ -475,6 +511,33 @@ gtt_current_user_can_drop(Oid relid)
 	return pg_class_ownercheck(relid, GetUserId());
 #endif
 }
+
+#if PG_VERSION_NUM < 140000
+/*
+ * Return true when the statement is one of those whose parse tree is
+ * modified by gtt_check_command(). Must be kept in sync with the rewrites
+ * done in gtt_check_command(). Only used with PostgreSQL < 14 where the
+ * ProcessUtility hook has no readOnlyTree flag to tell us whether the parse
+ * tree can be modified.
+ */
+static bool
+gtt_stmt_is_rewritten(Node *parsetree)
+{
+	if (parsetree == NULL)
+		return false;
+
+	switch (nodeTag(parsetree))
+	{
+		/* the pgtt schema is appended to the list of schemas */
+		case T_VariableSetStmt:
+		/* the relation is moved to the pgtt schema and set unlogged */
+		case T_CreateTableAsStmt:
+			return true;
+		default:
+			return false;
+	}
+}
+#endif
 
 /*
  * Look at utility command to search CREATE TABLE / DROP TABLE

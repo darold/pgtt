@@ -38,3 +38,19 @@ SHOW search_path;
 -- Test empty search path like set by pg_dump
 SELECT pg_catalog.set_config('search_path', '', false);
 SHOW search_path;
+
+-- Repeated SET search_path in a PL/pgSQL loop. The parse tree of the SET
+-- statement is cached and reused at each iteration, the extension must not
+-- add its schema to the statement itself. See issue #59.
+\c - -
+CREATE OR REPLACE FUNCTION test_searchpath_repeated() RETURNS void AS $$
+BEGIN
+    FOR i IN 1..100 LOOP
+        SET search_path = public;
+        PERFORM decode(repeat('00', 1024), 'hex');
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+SELECT test_searchpath_repeated();
+SHOW search_path;
+DROP FUNCTION test_searchpath_repeated();
