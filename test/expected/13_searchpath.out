@@ -59,9 +59,9 @@ SHOW search_path;
 
 CREATE EXTENSION pgtt;
 SHOW search_path;
-       search_path        
---------------------------
-  pgtt_schema, pg_catalog
+       search_path       
+-------------------------
+ pgtt_schema, pg_catalog
 (1 row)
 
 -- Test the pg_catalog at end of search_path.
@@ -119,3 +119,48 @@ SHOW search_path;
 (1 row)
 
 DROP FUNCTION test_searchpath_repeated();
+-- The pgtt schema must be looked for in the search_path using an exact
+-- comparison of the schema names: a schema whose name just includes the
+-- name of the pgtt schema must not prevent it to be added, and a schema
+-- whose name ends with pg_catalog must not be truncated.
+\c - -
+CREATE SCHEMA pgtt_schema_bak;
+CREATE SCHEMA foo_pg_catalog;
+SELECT pg_catalog.set_config('search_path', 'public, pgtt_schema_bak', false);
+       set_config        
+-------------------------
+ public, pgtt_schema_bak
+(1 row)
+
+SHOW search_path;
+             search_path              
+--------------------------------------
+ public, pgtt_schema_bak, pgtt_schema
+(1 row)
+
+SELECT pg_catalog.set_config('search_path', 'public, foo_pg_catalog', false);
+       set_config       
+------------------------
+ public, foo_pg_catalog
+(1 row)
+
+SHOW search_path;
+             search_path             
+-------------------------------------
+ public, foo_pg_catalog, pgtt_schema
+(1 row)
+
+SELECT pg_catalog.set_config('search_path', 'public, foo_pg_catalog, pg_catalog', false);
+             set_config             
+------------------------------------
+ public, foo_pg_catalog, pg_catalog
+(1 row)
+
+SHOW search_path;
+                   search_path                   
+-------------------------------------------------
+ public, foo_pg_catalog, pgtt_schema, pg_catalog
+(1 row)
+
+DROP SCHEMA pgtt_schema_bak;
+DROP SCHEMA foo_pg_catalog;

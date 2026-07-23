@@ -62,6 +62,7 @@
 #include "utils/lsyscache.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
+#include "utils/varlena.h"
 
 #if PG_VERSION_NUM < 110000
 #include "utils/memutils.h"
@@ -2473,61 +2474,123 @@ is_catalog_relid(Oid relid)
 static void
 force_pgtt_namespace(void)
 {
-	bool			override = false;
 	char		   *old_search_path;
-	const char	   *pgtt_schema = quote_identifier(pgtt_namespace_name);
+	char		   *path_copy;
+	List		   *namelist = NIL;
+	ListCell	   *l;
+	bool			found = false;
+	bool			keep_pg_catalog_last = false;
+	const char	   *pgtt_schema;
 	StringInfoData	search_path;
 
 	if (!IsTransactionState() || GttHashTable == NULL)
 		return;
 
-	initStringInfo(&search_path);
-
+	/* This is a copy of the value, it must be freed before returning. */
 	old_search_path = GetConfigOptionByName("search_path", NULL, false);
-	if (old_search_path == NULL)
+
+	/* An empty search_path is set by pg_dump, leave it as this. */
+	if (old_search_path != NULL && old_search_path[0] == '\0')
 	{
-		appendStringInfo(&search_path, "%s", pgtt_schema);
-		override = true;
+		pfree(old_search_path);
+		return;
 	}
-	else if (strlen(old_search_path) > 0 && strstr(old_search_path, pgtt_schema) == NULL)
+
+	if (old_search_path != NULL)
 	{
 		/*
-		 * first look if pg_catalog is at end of the search path to keep
-		 * it at end. This is not the same behavior if it not kept at the
-		 * end when there is pg_catalog functions overloaded in another
-		 * schema
+		 * Look for our schema in the current search path. The schemas must
+		 * be compared one by one, looking for the name of our schema in the
+		 * whole value would also match a schema whose name just includes it,
+		 * "pgtt_schema_old" for example.
+		 *
+		 * SplitIdentifierString() writes into the string it is given and
+		 * returns the schema names as they are used to resolve the relations
+		 * (unquoted and lowercased when necessary), this is why a copy of
+		 * the value is parsed here.
 		 */
-		bool at_end = false;
-		int len = strlen(old_search_path) - 10;
-		char *p = strstr(old_search_path, "pg_catalog");
-		if (p != NULL && strcmp(p, "pg_catalog") == 0)
+		path_copy = pstrdup(old_search_path);
+		if (!SplitIdentifierString(path_copy, ',', &namelist))
 		{
-			/* remove redundant whitespaces */
-			while (len > 0 && isspace(old_search_path[len - 1]))
-				len--;
-			old_search_path[len] = '\0';
+			/* Not supposed to happen, let PostgreSQL complain about it. */
+			list_free(namelist);
+			pfree(path_copy);
+			pfree(old_search_path);
+			return;
+		}
 
-			appendStringInfo(&search_path, "%s %s", old_search_path, pgtt_schema);
-			at_end = true;
-		}
-		else
+		foreach(l, namelist)
 		{
-			appendStringInfo(&search_path, "%s, %s", old_search_path, pgtt_schema);
+			if (strcmp((char *) lfirst(l), pgtt_namespace_name) == 0)
+			{
+				found = true;
+				break;
+			}
 		}
-		if (at_end)
-			appendStringInfo(&search_path, ", pg_catalog");
-		override = true;
+
+		/*
+		 * When pg_catalog is explicitly set at end of the search path it
+		 * must be kept at this place, this is not the same behavior if it
+		 * is not kept at the end when there is pg_catalog functions
+		 * overloaded in another schema.
+		 */
+		if (!found && namelist != NIL &&
+			strcmp((char *) llast(namelist), "pg_catalog") == 0)
+			keep_pg_catalog_last = true;
+
+		list_free(namelist);
+		pfree(path_copy);
+
+		/* Nothing to do, our schema is already in the search path. */
+		if (found)
+		{
+			pfree(old_search_path);
+			return;
+		}
 	}
 
-	if (override)
+	/* Override the search_path by adding our pgtt schema. */
+	pgtt_schema = quote_identifier(pgtt_namespace_name);
+	initStringInfo(&search_path);
+
+	if (old_search_path == NULL)
+		appendStringInfoString(&search_path, pgtt_schema);
+	else if (keep_pg_catalog_last)
 	{
-		/* Override the search_path by adding our pgtt schema. */
-		SetConfigOption("search_path", search_path.data,
-						(superuser() ? PGC_SUSET : PGC_USERSET),
-						PGC_S_SESSION);
+		/*
+		 * Add our schema just before the trailing pg_catalog. The last comma
+		 * of the value is necessarily the separator of the last schema as
+		 * pg_catalog can not include a comma.
+		 */
+		char   *sep = strrchr(old_search_path, ',');
 
-		elog(DEBUG1, "search_path forced to %s.", search_path.data);
+		if (sep != NULL)
+		{
+			int		len = sep - old_search_path;
+
+			/* remove redundant whitespaces */
+			while (len > 0 && isspace((unsigned char) old_search_path[len - 1]))
+				len--;
+
+			appendBinaryStringInfo(&search_path, old_search_path, len);
+			appendStringInfoString(&search_path, ", ");
+		}
+		appendStringInfo(&search_path, "%s, pg_catalog", pgtt_schema);
 	}
+	else
+		appendStringInfo(&search_path, "%s, %s", old_search_path, pgtt_schema);
+
+	SetConfigOption("search_path", search_path.data,
+					(superuser() ? PGC_SUSET : PGC_USERSET),
+					PGC_S_SESSION);
+
+	elog(DEBUG1, "search_path forced to %s.", search_path.data);
+
+	pfree(search_path.data);
+	if (pgtt_schema != pgtt_namespace_name)
+		pfree((char *) pgtt_schema);
+	if (old_search_path != NULL)
+		pfree(old_search_path);
 }
 
 /*

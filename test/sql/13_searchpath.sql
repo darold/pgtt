@@ -54,3 +54,19 @@ $$ LANGUAGE plpgsql;
 SELECT test_searchpath_repeated();
 SHOW search_path;
 DROP FUNCTION test_searchpath_repeated();
+
+-- The pgtt schema must be looked for in the search_path using an exact
+-- comparison of the schema names: a schema whose name just includes the
+-- name of the pgtt schema must not prevent it to be added, and a schema
+-- whose name ends with pg_catalog must not be truncated.
+\c - -
+CREATE SCHEMA pgtt_schema_bak;
+CREATE SCHEMA foo_pg_catalog;
+SELECT pg_catalog.set_config('search_path', 'public, pgtt_schema_bak', false);
+SHOW search_path;
+SELECT pg_catalog.set_config('search_path', 'public, foo_pg_catalog', false);
+SHOW search_path;
+SELECT pg_catalog.set_config('search_path', 'public, foo_pg_catalog, pg_catalog', false);
+SHOW search_path;
+DROP SCHEMA pgtt_schema_bak;
+DROP SCHEMA foo_pg_catalog;
