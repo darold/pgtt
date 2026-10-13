@@ -164,3 +164,11 @@ SHOW search_path;
 
 DROP SCHEMA pgtt_schema_bak;
 DROP SCHEMA foo_pg_catalog;
+-- Test non-string argument in SET search_path (should not crash)
+SET search_path = 123;
+SHOW search_path;
+   search_path    
+------------------
+ 123, pgtt_schema
+(1 row)
+

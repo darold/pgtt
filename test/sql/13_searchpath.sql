@@ -70,3 +70,7 @@ SELECT pg_catalog.set_config('search_path', 'public, foo_pg_catalog, pg_catalog'
 SHOW search_path;
 DROP SCHEMA pgtt_schema_bak;
 DROP SCHEMA foo_pg_catalog;
+
+-- Test non-string argument in SET search_path (should not crash)
+SET search_path = 123;
+SHOW search_path;
