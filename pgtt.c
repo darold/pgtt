@@ -583,19 +583,29 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 			{
 				ListCell *l;
 				bool     found = false;
+				char    *nspname;
 
 				if (stmt->args == NIL)
+					break;
+
+				nspname = get_namespace_name(pgtt_namespace_oid);
+				if (nspname == NULL)
 					break;
 
 				foreach(l, stmt->args)
 				{
 					Node    *arg = (Node *) lfirst(l);
-					A_Const *con = (A_Const *) arg;
+					A_Const *con;
 					char    *val;
 
+					if (!IsA(arg, A_Const))
+						continue;
+					con = (A_Const *) arg;
+					if (!IsA(&con->val, String))
+						continue;
+
 					val = strVal(&con->val);
-					if (strcmp(val,
-						get_namespace_name(pgtt_namespace_oid)) == 0)
+					if (strcmp(val, nspname) == 0)
 						found = true;
 				}
 
@@ -603,14 +613,13 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 				if (!found)
 				{
 					A_Const *newcon = makeNode(A_Const);
-					char *str = (char *) get_namespace_name(pgtt_namespace_oid);
 
 #if PG_VERSION_NUM < 150000
 					newcon->val.type = T_String;
-					newcon->val.val.str = pstrdup(str);
+					newcon->val.val.str = pstrdup(nspname);
 #else
 					newcon->val.node.type = T_String;
-					newcon->val.sval.sval = pstrdup(str);
+					newcon->val.sval.sval = pstrdup(nspname);
 #endif
 					newcon->location = strlen(queryString);
 					stmt->args = lappend(stmt->args, newcon);
