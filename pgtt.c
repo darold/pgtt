@@ -57,7 +57,6 @@
 #include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
-#include "utils/formatting.h"
 #include "utils/inval.h"
 #include "utils/lsyscache.h"
 #include "utils/snapmgr.h"
@@ -223,7 +222,6 @@ do { \
 PGDLLEXPORT void	_PG_init(void);
 PGDLLEXPORT void	_PG_fini(void);
 
-int strpos(char *hay, char *needle, int offset);
 static Oid gtt_create_table_statement(Gtt gtt);
 static void gtt_create_table_as(Gtt gtt, bool skipdata);
 static void gtt_unregister_global_temporary_table(const char *relname);
@@ -691,9 +689,8 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 						(errmsg("use of ON COMMIT DROP with GLOBAL TEMPORARY is not allowed"),
 						 errhint("Create a local temporary table inside a transaction instead, this is the default behavior.")));
 
-			elog(DEBUG1, "Create table %s, rows persistance: %d, GLOBAL at position: %d",
-						name, preserved,
-						strpos(asc_toupper(queryString, strlen(queryString)), "GLOBAL", 0));
+			elog(DEBUG1, "Create table %s, rows persistance: %d",
+						name, preserved);
 
 			/* Force creation of the temporary table in our pgtt schema */
 			stmt->into->rel->schemaname = pstrdup(pgtt_namespace_name);
@@ -820,9 +817,8 @@ gtt_check_command(GTT_PROCESSUTILITY_PROTO)
 						(errmsg("use of ON COMMIT DROP with GLOBAL TEMPORARY is not allowed"),
 						 errhint("Create a local temporary table inside a transaction instead, this is the default behavior.")));
 
-			elog(DEBUG1, "Create table %s, rows persistance: %d, GLOBAL at position: %d",
-						name, preserved,
-						strpos(asc_toupper(queryString, strlen(queryString)), "GLOBAL", 0));
+			elog(DEBUG1, "Create table %s, rows persistance: %d",
+						name, preserved);
 
 			/* Create the Global Temporary Table template and register the table */
 			gtt.relid = 0;
@@ -1335,30 +1331,6 @@ is_declared_gtt(Oid relid)
 	}
 
 	return false;
-}
-
-
-int
-strpos(char *hay, char *needle, int offset)
-{
-	char *haystack;
-	char *p;
-
-	haystack = (char *) malloc(strlen(hay));
-	if (haystack == NULL)
-	{
-		fprintf(stderr, "out of memory\n");
-		exit(EXIT_FAILURE);
-		return -1;
-	}
-	memset(haystack, 0, strlen(hay));
-
-	strncpy(haystack, hay+offset, strlen(hay)-offset);
-	p = strstr(haystack, needle);
-	if (p)
-		return p - haystack+offset;
-
-	return -1;
 }
 
 /*
