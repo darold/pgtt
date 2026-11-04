@@ -1399,7 +1399,7 @@ gtt_create_table_statement(Gtt gtt)
 			quote_literal_cstr(pgtt_namespace_name));
 
 	result = SPI_exec(newQueryString, 0);
-	if (result != SPI_OK_SELECT && SPI_processed != 1)
+	if (result != SPI_OK_SELECT || SPI_processed != 1)
 		ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 	oidDatum = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isnull);
@@ -2677,7 +2677,7 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 			quote_literal_cstr(pgtt_namespace_name));
 
 	result = SPI_exec(newQueryString, 0);
-	if (result != SPI_OK_SELECT && SPI_processed != 1)
+	if (result != SPI_OK_SELECT || SPI_processed != 1)
 		ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 	oidDatum = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isnull);
@@ -2719,7 +2719,7 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 				quote_literal_cstr(namespaceName));
 
 		result = SPI_exec(newQueryString, 0);
-		if (result != SPI_OK_SELECT && SPI_processed != 1)
+		if (result != SPI_OK_SELECT || SPI_processed != 1)
 			ereport(ERROR, (errmsg("execution failure on query: \"%s\"", newQueryString)));
 
 		oidDatum = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isnull);
@@ -2727,7 +2727,7 @@ gtt_create_table_as(Gtt gtt, bool skipdata)
 		if (!isnull)
 			gtt.temp_relid = DatumGetInt32(oidDatum);
 
-		if (isnull || !OidIsValid(gttOid))
+		if (isnull || !OidIsValid(gtt.temp_relid))
 			ereport(ERROR,
 					(errmsg("can not get OID of newly created temporary table %s",
 								quote_identifier(gtt.relname))));
