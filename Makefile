@@ -23,7 +23,7 @@ TESTS        = 00_init 01_oncommitdelete 02_oncommitpreserve \
 	       09_transaction 10_foreignkey 11_after_error \
 	       12_droptable 13_searchpath 14_concurrent_index \
 	       15_security_grants 16_sql_injection 17_drop_authorization \
-	       18_subquery 19_trigger
+	       18_subquery 19_trigger 20_spi_lookup
 
 REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --inputdir=test
